@@ -5,12 +5,28 @@ import { buildChildrenMap, layoutOverlaps } from '../lib/tree'
 import BlockCard from './BlockCard'
 import QuickCreate from './QuickCreate'
 
-export const PX_PER_MIN = 1.2
-const SNAP = 15
-const HOURS = Array.from({ length: 24 }, (_, h) => h)
-const snapDown = (m) => Math.floor(m / SNAP) * SNAP
-const snapNear = (m) => Math.round(m / SNAP) * SNAP
+// Vertical zoom: pixels per minute. Pinch (trackpad / touch) or Ctrl+scroll changes it.
+const DEFAULT_PPM = 1.2
+const MIN_PPM = 0.5
+const MAX_PPM = 6
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+
+function readZoom() {
+  try {
+    const v = Number(localStorage.getItem('vapor:zoom'))
+    return v >= MIN_PPM && v <= MAX_PPM ? v : DEFAULT_PPM
+  } catch {
+    return DEFAULT_PPM
+  }
+}
+
+/** Time-axis labels: hours, plus half/quarter hours once there's room. */
+function axisLabels(ppm) {
+  const step = ppm >= 4.5 ? 15 : ppm >= 2.4 ? 30 : 60
+  const out = []
+  for (let m = step; m < DAY_MINUTES; m += step) out.push(m)
+  return out
+}
 
 function useNow() {
   const [now, setNow] = useState(() => ({ date: new Date(), mins: nowMinutes() }))
@@ -28,6 +44,17 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
   const gesture = useRef(null)
   const [draft, setDraft] = useState(null) // creation drag {day, start, end}
   const [preview, setPreview] = useState(null) // move/resize {id, date, start, end}
+  const headRef = useRef(null)
+  const [ppm, setPpm] = useState(readZoom)
+  const ppmRef = useRef(ppm) // scale currently on screen
+  const pendingPpm = useRef(null) // scale requested but not yet rendered
+  const zoomAnchor = useRef(null) // { minute, y }: keep this minute under the fingers
+  const [zoomHint, setZoomHint] = useState(false)
+  const hintTimer = useRef(null)
+  // Finer drag snapping when zoomed in.
+  const SNAP = ppm >= 2.4 ? 5 : 15
+  const snapDown = (m) => Math.floor(m / SNAP) * SNAP
+  const snapNear = (m) => Math.round(m / SNAP) * SNAP
   const now = useNow()
   const dayISO = useMemo(() => days.map(toISODate), [days])
   const todayIndex = days.findIndex((d) => isSameDay(d, now.date))
@@ -38,9 +65,111 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
     if (!el) return
     const n = nowMinutes()
     const target = todayIndex >= 0 && n >= 9 * 60 ? n - 120 : 7 * 60
-    el.scrollTop = Math.max(0, target * PX_PER_MIN)
+    el.scrollTop = Math.max(0, target * ppmRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Zoom ──
+  // Apply a new scale, then restore scroll so the anchored minute stays put.
+  useLayoutEffect(() => {
+    ppmRef.current = ppm
+    pendingPpm.current = null
+    const a = zoomAnchor.current
+    const el = scrollRef.current
+    if (a && el) el.scrollTop = (headRef.current?.offsetHeight ?? 0) + a.minute * ppm - a.y
+    zoomAnchor.current = null
+    try {
+      localStorage.setItem('vapor:zoom', String(ppm))
+    } catch {
+      /* storage unavailable */
+    }
+  }, [ppm])
+
+  const zoomTo = useCallback((clientY, target) => {
+    const el = scrollRef.current
+    const cols = colsRef.current
+    if (!el || !cols) return
+    const next = clamp(target, MIN_PPM, MAX_PPM)
+    if (Math.abs(next - (pendingPpm.current ?? ppmRef.current)) < 0.001) return
+    if (!zoomAnchor.current) {
+      // Measure against what's rendered; several events may land before the next paint.
+      const minute = clamp((clientY - cols.getBoundingClientRect().top) / ppmRef.current, 0, DAY_MINUTES)
+      zoomAnchor.current = { minute, y: clientY - el.getBoundingClientRect().top }
+    }
+    pendingPpm.current = next
+    setPpm(next)
+    setZoomHint(true)
+    clearTimeout(hintTimer.current)
+    hintTimer.current = setTimeout(() => setZoomHint(false), 1400)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const current = () => pendingPpm.current ?? ppmRef.current
+
+    // Trackpad pinch arrives as ctrl+wheel in Chrome/Firefox/Edge (and Ctrl+mouse wheel works too).
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const unit = e.deltaMode === 1 ? 0.05 : 0.01
+      zoomTo(e.clientY, current() * Math.exp(-e.deltaY * unit))
+    }
+    // Safari sends gesture events for trackpad pinch.
+    let gestureBase = null
+    const onGestureStart = (e) => {
+      e.preventDefault()
+      gestureBase = current()
+    }
+    const onGestureChange = (e) => {
+      e.preventDefault()
+      if (gestureBase) zoomTo(e.clientY, gestureBase * e.scale)
+    }
+    const onGestureEnd = () => (gestureBase = null)
+    // Two-finger pinch on touch screens: vertical finger distance drives the scale.
+    let pinch = null
+    const spread = (t) => Math.max(Math.abs(t[0].clientY - t[1].clientY), 30)
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 2) return
+      gesture.current?.onCancel() // a finger may have started a create/move
+      pinch = { dist: spread(e.touches), base: current() }
+    }
+    const onTouchMove = (e) => {
+      if (!pinch || e.touches.length !== 2) return
+      e.preventDefault()
+      const mid = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      zoomTo(mid, (pinch.base * spread(e.touches)) / pinch.dist)
+    }
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) pinch = null
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('gesturestart', onGestureStart)
+    el.addEventListener('gesturechange', onGestureChange)
+    el.addEventListener('gestureend', onGestureEnd)
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', onGestureStart)
+      el.removeEventListener('gesturechange', onGestureChange)
+      el.removeEventListener('gestureend', onGestureEnd)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [zoomTo])
+
+  useEffect(() => () => clearTimeout(hintTimer.current), [])
+
+  const resetZoom = () => {
+    const el = scrollRef.current
+    if (el) zoomTo(el.getBoundingClientRect().top + el.clientHeight / 2, DEFAULT_PPM)
+  }
 
   const childrenMap = useMemo(() => buildChildrenMap(blocks), [blocks])
 
@@ -73,7 +202,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
   }, [visible, preview, dayISO])
 
   // ── Geometry helpers ──
-  const minutesAt = (clientY) => (clientY - colsRef.current.getBoundingClientRect().top) / PX_PER_MIN
+  const minutesAt = (clientY) => (clientY - colsRef.current.getBoundingClientRect().top) / ppm
   const dayAt = (clientX) => {
     const r = colsRef.current.getBoundingClientRect()
     return clamp(Math.floor(((clientX - r.left) / r.width) * days.length), 0, days.length - 1)
@@ -148,7 +277,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
       move: (ev) => {
         if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return
         moved = true
-        const dy = snapNear((ev.clientY - y0) / PX_PER_MIN)
+        const dy = snapNear((ev.clientY - y0) / ppm)
         if (mode === 'move') {
           const start = clamp(block.start + dy, 0, DAY_MINUTES - dur)
           next = { id: block.id, date: dayISO[dayAt(ev.clientX)], start, end: start + dur }
@@ -171,10 +300,10 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
   const quickDay = quickBlock ? dayISO.indexOf(quickBlock.date) : -1
 
   return (
-    <div className="week" style={{ '--days': days.length }}>
+    <div className="week" style={{ '--days': days.length, '--hour': `${60 * ppm}px` }}>
       <div className="week-scroll" ref={scrollRef}>
-        <div className="week-head">
-          <div className="gutter-head">{Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace('_', ' ')}</div>
+        <div className="week-head" ref={headRef}>
+          <div className="gutter-head" onDoubleClick={resetZoom} title="Pinch or Ctrl+scroll to zoom · double-click to reset">{Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace('_', ' ')}</div>
           {days.map((d, i) => (
             <div key={dayISO[i]} className={`day-head ${i === todayIndex ? 'today' : ''}`}>
               <span className="dow">{format(d, 'EEE')}</span>
@@ -183,15 +312,15 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
           ))}
         </div>
 
-        <div className="week-body" style={{ height: DAY_MINUTES * PX_PER_MIN }}>
+        <div className="week-body" style={{ height: DAY_MINUTES * ppm }}>
           <div className="gutter">
-            {HOURS.map((h) => (
-              <div key={h} className="hour-label" style={{ top: h * 60 * PX_PER_MIN }}>
-                {h === 0 ? '' : `${String(h).padStart(2, '0')}:00`}
+            {axisLabels(ppm).map((m) => (
+              <div key={m} className={`hour-label ${m % 60 ? 'minor' : ''}`} style={{ top: m * ppm }}>
+                {fromMinutes(m)}
               </div>
             ))}
             {todayIndex >= 0 && (
-              <div className="now-label" style={{ top: now.mins * PX_PER_MIN }}>
+              <div className="now-label" style={{ top: now.mins * ppm }}>
                 {fromMinutes(now.mins)}
               </div>
             )}
@@ -209,7 +338,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
                 >
                   {list.map((b) => {
                     const { col, cols } = layout.get(b.id) ?? { col: 0, cols: 1 }
-                    const height = Math.max((b.end - b.start) * PX_PER_MIN - 3, 18)
+                    const height = Math.max((b.end - b.start) * ppm - 3, 18)
                     return (
                       <BlockCard
                         key={b.id}
@@ -218,7 +347,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
                         ctx={ctx}
                         dragging={preview?.id === b.id}
                         style={{
-                          top: b.start * PX_PER_MIN + 1,
+                          top: b.start * ppm + 1,
                           height,
                           left: `calc(${(col / cols) * 100}% + 4px)`,
                           width: `calc(${100 / cols}% - 8px)`,
@@ -230,13 +359,13 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
                   })}
 
                   {draft?.day === i && (
-                    <div className="draft" style={{ top: draft.start * PX_PER_MIN, height: (draft.end - draft.start) * PX_PER_MIN }}>
+                    <div className="draft" style={{ top: draft.start * ppm, height: (draft.end - draft.start) * ppm }}>
                       {!draft.pending && `${fromMinutes(draft.start)} – ${fromMinutes(draft.end)}`}
                     </div>
                   )}
 
                   {i === todayIndex && (
-                    <div className="now-line" style={{ top: now.mins * PX_PER_MIN }}>
+                    <div className="now-line" style={{ top: now.mins * ppm }}>
                       <span />
                     </div>
                   )}
@@ -249,7 +378,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
                 key={quickBlock.id}
                 block={quickBlock}
                 store={store}
-                style={quickPosition(quickDay, days.length, quickBlock.start)}
+                style={quickPosition(quickDay, days.length, quickBlock.start, ppm)}
                 onClose={onQuickClose}
                 onExpand={() => onQuickExpand(quickBlock.id)}
               />
@@ -257,12 +386,22 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
           </div>
         </div>
       </div>
+      {zoomHint && (
+        <div className="zoom-hint" role="status">
+          {Math.round((ppm / DEFAULT_PPM) * 100)}%
+          {Math.abs(ppm - DEFAULT_PPM) > 0.01 && (
+            <button className="link-btn" onClick={resetZoom}>
+              Reset
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function quickPosition(dayIndex, dayCount, start) {
-  const top = clamp(start * PX_PER_MIN, 8, DAY_MINUTES * PX_PER_MIN - 360)
+function quickPosition(dayIndex, dayCount, start, ppm) {
+  const top = clamp(start * ppm, 8, DAY_MINUTES * ppm - 360)
   if (dayCount === 1) return { top: top + 24, right: 12 }
   const colPct = 100 / dayCount
   const toRight = dayCount === 7 ? dayIndex < 5 : dayIndex < dayCount / 2

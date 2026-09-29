@@ -2,8 +2,23 @@ import { useEffect, useState } from 'react'
 import { isConfigured, supabase } from './lib/supabase'
 import Login from './components/Login'
 import Workspace from './components/Workspace'
+import SharedWorkspace from './components/SharedWorkspace'
+import BookingPage from './components/BookingPage'
+
+// Guest routes work without signing in.
+const SHARE_ROUTE = /^\/s\/([\w-]{24,})\/?$/
+const BOOKING_ROUTE = /^\/b\/([\w-]{24,})\/?$/
 
 export default function App() {
+  const path = window.location.pathname
+  const booking = BOOKING_ROUTE.exec(path)
+  if (booking) return <BookingPage token={booking[1]} />
+  const share = SHARE_ROUTE.exec(path)
+  if (share) return <SharedWorkspace token={share[1]} />
+  return <OwnerApp />
+}
+
+function OwnerApp() {
   const [session, setSession] = useState(undefined)
 
   useEffect(() => {

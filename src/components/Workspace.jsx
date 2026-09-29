@@ -9,6 +9,8 @@ import WeekView from './WeekView'
 import ListView from './ListView'
 import BlockPanel from './BlockPanel'
 import Integrations from './Integrations'
+import Sharing from './Sharing'
+import { ownerBackend } from '../lib/backends'
 import StatusFilter from './StatusFilter'
 import Toasts from './Toasts'
 import { useToasts } from './useToasts'
@@ -40,8 +42,16 @@ function useDayCount() {
   return n
 }
 
-export default function Workspace({ session }) {
-  const [view, setView] = useState(() => readPref('view', 'calendar'))
+/**
+ * The main app. Signed-in owners get their own calendar; a guest with an edit
+ * link passes `backend` (the share API) and `guest` ({ owner }) instead.
+ */
+export default function Workspace({ session, backend: backendProp, guest }) {
+  const [viewPref, setView] = useState(() => readPref('view', 'calendar'))
+  // Guests only get the calendar and the agenda.
+  const view = guest && !['calendar', 'list'].includes(viewPref) ? 'calendar' : viewPref
+  const userId = session?.user.id
+  const backend = useMemo(() => backendProp ?? ownerBackend(userId), [backendProp, userId])
   const [anchor, setAnchor] = useState(() => new Date())
   const dayCount = useDayCount()
   const days = useMemo(() => visibleDays(anchor, dayCount), [anchor, dayCount])
@@ -61,7 +71,7 @@ export default function Workspace({ session }) {
   const [navOpen, setNavOpen] = useState(false)
   const { toasts, push: toast, dismiss } = useToasts()
 
-  const store = useVapor(session, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
+  const store = useVapor(backend, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
   const { blocks: rawBlocks, categories } = store
   // Series templates expanded into occurrences for the visible range.
   const { display: blocks, aliases } = useMemo(
@@ -77,7 +87,7 @@ export default function Workspace({ session }) {
   const selectedId = resolveShown(selectedRaw)
   const quickId = resolveShown(quickRaw)
 
-  useEffect(() => writePref('view', view), [view])
+  useEffect(() => writePref('view', viewPref), [viewPref])
   useEffect(() => writePref('hiddenCats', [...hiddenCats]), [hiddenCats])
   useEffect(
     () => writePref('hiddenStatuses', STATUSES.map((s) => s.id).filter((id) => !statusFilter.has(id))),
@@ -166,8 +176,10 @@ export default function Workspace({ session }) {
   const pageMeta = {
     calendar: ['Calendar', 'Drag on the grid to add a block'],
     list: ['Agenda', 'Blocks in this range'],
+    sharing: ['Sharing', 'Let others edit your calendar or book time with you'],
     integrations: ['Integrations', 'Connect AI clients over MCP'],
   }[view]
+  if (guest) pageMeta[1] = `You're editing ${guest.owner ? `${guest.owner}'s` : 'a shared'} calendar`
 
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''}`}>
@@ -183,20 +195,24 @@ export default function Workspace({ session }) {
         activeCategory={defaultCategoryId}
         setActiveCategory={setActiveCategory}
         onClose={() => setNavOpen(false)}
+        guest={guest}
       />
       <div className="main">
         <Topbar
           title={pageMeta[0]}
           subtitle={pageMeta[1]}
           session={session}
+          guest={guest}
           search={search}
           setSearch={setSearch}
-          showSearch={view !== 'integrations'}
+          showSearch={view === 'calendar' || view === 'list'}
           onMenu={() => setNavOpen(true)}
         />
         <div className="content">
           {view === 'integrations' ? (
             <Integrations toast={toast} />
+          ) : view === 'sharing' ? (
+            <Sharing toast={toast} />
           ) : (
             <section className="panel calendar-panel">
               <div className="toolbar">

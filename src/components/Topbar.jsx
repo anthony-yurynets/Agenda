@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Search, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-export default function Topbar({ title, subtitle, session, search, setSearch, showSearch, onMenu }) {
-  const user = session.user
-  const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email
-  const avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture
+export default function Topbar({ title, subtitle, session, guest, search, setSearch, showSearch, onMenu }) {
+  const user = session?.user
+  const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email
+  const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
   const searchRef = useRef(null)
@@ -50,6 +50,11 @@ export default function Topbar({ title, subtitle, session, search, setSearch, sh
           <kbd>/</kbd>
         </label>
       )}
+      {guest ? (
+        <div className="guest-pill" title="Anyone with this link can view and edit">
+          <Users size={15} /> Shared link
+        </div>
+      ) : (
       <div className="user" ref={menuRef}>
         <button className="user-btn" onClick={() => setOpen((o) => !o)}>
           {avatar ? (
@@ -71,6 +76,7 @@ export default function Topbar({ title, subtitle, session, search, setSearch, sh
           </div>
         )}
       </div>
+      )}
     </header>
   )
 }

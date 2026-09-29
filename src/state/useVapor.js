@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
 import {
   DEFAULT_CATEGORIES,
   CATEGORY_PALETTE,
@@ -26,6 +25,7 @@ const fromRow = (r) => ({
   repeat_exdates: r.repeat_exdates ?? [],
   recurrence_id: r.recurrence_id ?? null,
   recurrence_date: r.recurrence_date ?? null,
+  bookable: r.bookable ?? false,
 })
 
 const toRow = (b, userId) => ({
@@ -44,6 +44,7 @@ const toRow = (b, userId) => ({
   repeat_exdates: b.repeat_exdates ?? [],
   recurrence_id: b.recurrence_id ?? null,
   recurrence_date: b.recurrence_date ?? null,
+  bookable: b.bookable ?? false,
 })
 
 const patchToRow = (patch) => {
@@ -60,10 +61,14 @@ const childrenOf = (all, id) => Object.values(all).filter((b) => b.parent_id ===
 const findException = (all, templateId, date) =>
   Object.values(all).find((b) => b.recurrence_id === templateId && b.recurrence_date === date)
 
-const MIGRATION_HINT = 'Run supabase/migrations/0002_repeats.sql in the Supabase SQL editor to enable repeats.'
+const MIGRATION_HINT = 'Your database is missing a migration: run the files in supabase/migrations (in order) in the Supabase SQL editor.'
 
-export function useVapor(session, { rangeStart, rangeEnd, onError }) {
-  const userId = session.user.id
+/**
+ * The calendar store. `backend` decides where data lives: the signed-in owner's
+ * Supabase tables, or the share-link API for a guest editor (see lib/backends).
+ */
+export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
+  const userId = backend.userId
   const [blocks, setBlocks] = useState({})
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -106,7 +111,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       .catch((err) => {
         rollback?.()
         const msg = err.message ?? 'Something went wrong'
-        errorRef.current?.(/repeat|recurrence/.test(msg) && /column/.test(msg) ? MIGRATION_HINT : msg)
+        errorRef.current?.(/repeat|recurrence|bookable|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
       })
       .finally(() => ids.forEach(release))
   }, [])
@@ -125,58 +130,60 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { data, error } = await supabase.from('categories').select('*').order('position')
+      const { data, error } = await backend.loadCategories()
       if (cancelled) return
       if (error) return errorRef.current?.(error.message)
-      if (data.length) return setCategories(data)
+      if (data.length || !backend.canSeedCategories) return setCategories(data)
       const seed = DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: crypto.randomUUID(), user_id: userId, position: i }))
       setCategories(seed)
-      const res = await supabase.from('categories').insert(seed)
+      const res = await backend.insertCategories(seed)
       if (res.error) errorRef.current?.(res.error.message)
     })()
     return () => {
       cancelled = true
     }
-  }, [userId])
+  }, [backend, userId])
+
+  // Guests have no realtime, so their backend asks to be polled (and we refresh on focus).
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!backend.pollMs) return
+    const bump = () => document.visibilityState === 'visible' && setTick((t) => t + 1)
+    const timer = setInterval(bump, backend.pollMs)
+    window.addEventListener('focus', bump)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', bump)
+    }
+  }, [backend])
 
   // ── Blocks for the visible range, plus any series that reach into it ──
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const inRange = `and(date.gte.${rangeStart},date.lte.${rangeEnd}),and(recurrence_date.gte.${rangeStart},recurrence_date.lte.${rangeEnd})`
-      const [range, series] = await Promise.all([
-        supabase.from('blocks').select('*').or(inRange),
-        supabase.from('blocks').select('*').not('repeat', 'is', null).lte('date', rangeEnd),
-      ])
+      const res = await backend.loadBlocks(rangeStart, rangeEnd)
       if (cancelled) return
       setLoading(false)
-
-      if (range.error?.code === '42703' || series.error?.code === '42703') {
-        // Repeats migration not applied yet — still show plain blocks.
-        errorRef.current?.(MIGRATION_HINT)
-        const plain = await supabase.from('blocks').select('*').gte('date', rangeStart).lte('date', rangeEnd)
-        if (!cancelled && !plain.error) upsertLocal(plain.data)
-        return
-      }
-      if (range.error || series.error) return errorRef.current?.((range.error ?? series.error).message)
-
-      // Sub-blocks of series templates live on the template's (earlier) date.
-      const rows = [...range.data, ...series.data]
-      let frontier = series.data.map((r) => r.id)
-      while (frontier.length && !cancelled) {
-        const { data, error } = await supabase.from('blocks').select('*').in('parent_id', frontier)
-        if (error) return errorRef.current?.(error.message)
-        rows.push(...data)
-        frontier = data.map((r) => r.id)
-      }
-      if (!cancelled) upsertLocal(rows)
+      if (res.error) return errorRef.current?.(res.error.message)
+      if (res.outdatedSchema) errorRef.current?.(MIGRATION_HINT)
+      if (backend.pollMs) {
+        // A polled snapshot is authoritative (it's how guests learn about deletes),
+        // except for rows with local edits still in flight.
+        commit((prev) => {
+          const next = {}
+          for (const r of res.data) next[r.id] = fromRow(r)
+          for (const id of pending.current.keys()) if (prev[id]) next[id] = prev[id]
+          return next
+        })
+        if (res.categories) setCategories(res.categories)
+      } else upsertLocal(res.data)
     })()
     return () => {
       cancelled = true
     }
-  }, [rangeStart, rangeEnd, upsertLocal])
+  }, [backend, rangeStart, rangeEnd, tick, commit, upsertLocal])
 
-  // ── Realtime: changes from the MCP server / other tabs ──
+  // ── Realtime: changes from the MCP server, shared editors, bookings, other tabs ──
   useEffect(() => {
     const removeLocal = (id) =>
       commit((prev) => {
@@ -185,37 +192,18 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
         delete next[id]
         return next
       })
-    const channel = supabase
-      .channel(`vapor-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks', filter: `user_id=eq.${userId}` }, (p) => {
-        const id = p.new?.id ?? p.old?.id
-        if (!id || pending.current.has(id)) return
-        if (p.eventType === 'DELETE') removeLocal(id)
-        else upsertLocal([p.new])
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `user_id=eq.${userId}` }, (p) => {
-        const id = p.new?.id ?? p.old?.id
-        if (!id || pending.current.has(id)) return
-        setCategories((prev) => {
-          if (p.eventType === 'DELETE') return prev.filter((c) => c.id !== id)
-          const exists = prev.some((c) => c.id === id)
-          return exists ? prev.map((c) => (c.id === id ? p.new : c)) : [...prev, p.new]
-        })
-      })
-      .subscribe()
-    // Deletes aren't filterable by column, so listen unfiltered for those.
-    const deletes = supabase
-      .channel(`vapor-del-${userId}`)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'blocks' }, (p) => {
-        const id = p.old?.id
-        if (id && !pending.current.has(id)) removeLocal(id)
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(deletes)
-    }
-  }, [userId, commit, upsertLocal])
+    return backend.subscribe({
+      onBlock: (row) => row?.id && !pending.current.has(row.id) && upsertLocal([row]),
+      onBlockDelete: (id) => id && !pending.current.has(id) && removeLocal(id),
+      onCategory: (row) => {
+        if (!row?.id || pending.current.has(row.id)) return
+        setCategories((prev) =>
+          prev.some((c) => c.id === row.id) ? prev.map((c) => (c.id === row.id ? row : c)) : [...prev, row],
+        )
+      },
+      onCategoryDelete: (id) => id && !pending.current.has(id) && setCategories((prev) => prev.filter((c) => c.id !== id)),
+    })
+  }, [backend, commit, upsertLocal])
 
   // ── Helpers ──
   const removeLocalRows = useCallback(
@@ -242,7 +230,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
         rows.map((r) => r.id),
         async () => {
           for (const level of byDepth) {
-            const res = await supabase.from('blocks').insert(level)
+            const res = await backend.insertBlocks(level)
             if (res.error) return res
           }
           return {}
@@ -250,7 +238,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
         () => removeLocalRows(rows.map((r) => r.id)),
       )
     },
-    [enqueue, removeLocalRows, userId],
+    [backend, enqueue, removeLocalRows, userId],
   )
 
   /**
@@ -342,7 +330,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       if (!debounce) {
         return enqueue(
           [id],
-          () => supabase.from('blocks').update(patchToRow(patch)).eq('id', id),
+          () => backend.updateBlock(id, patchToRow(patch)),
           () => commit((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...pickKeys(before, patch) } } : prev)),
         )
       }
@@ -356,11 +344,11 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       const run = () => {
         timers.current.delete(id)
         release(id)
-        enqueue([id], () => supabase.from('blocks').update(patchToRow(merged)).eq('id', id))
+        enqueue([id], () => backend.updateBlock(id, patchToRow(merged)))
       }
       timers.current.set(id, { patch: merged, run, handle: setTimeout(run, debounce) })
     },
-    [commit, enqueue, resolve],
+    [backend, commit, enqueue, resolve],
   )
 
   /** Move/resize a block; sub-blocks shift with it and are clamped into the new range. */
@@ -392,7 +380,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       })
       enqueue(
         changed.map((c) => c.id),
-        () => supabase.from('blocks').upsert(changed.map((c) => toRow(c, userId))),
+        () => backend.upsertBlocks(changed.map((c) => toRow(c, userId))),
         () =>
           commit((prev) => {
             const next = { ...prev }
@@ -401,7 +389,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
           }),
       )
     },
-    [commit, enqueue, resolve, userId],
+    [backend, commit, enqueue, resolve, userId],
   )
 
   const addExdate = useCallback(
@@ -452,7 +440,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       removeLocalRows(ids)
       enqueue(
         ids,
-        () => supabase.from('blocks').delete().eq('id', id),
+        () => backend.deleteBlock(id),
         () =>
           commit((prev) => {
             const next = { ...prev }
@@ -461,7 +449,7 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
           }),
       )
     },
-    [addExdate, commit, enqueue, removeLocalRows],
+    [addExdate, backend, commit, enqueue, removeLocalRows],
   )
 
   /** Delete a block. For a virtual occurrence, only that one date is removed from the series. */
@@ -556,20 +544,20 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
       setCategories((prev) => [...prev, cat])
       enqueue(
         [cat.id],
-        () => supabase.from('categories').insert(cat),
+        () => backend.insertCategories([cat]),
         () => setCategories((prev) => prev.filter((c) => c.id !== cat.id)),
       )
       return cat.id
     },
-    [categories.length, enqueue, userId],
+    [backend, categories.length, enqueue, userId],
   )
 
   const updateCategory = useCallback(
     (id, patch) => {
       setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
-      enqueue([id], () => supabase.from('categories').update(patch).eq('id', id))
+      enqueue([id], () => backend.updateCategory(id, patch))
     },
-    [enqueue],
+    [backend, enqueue],
   )
 
   const deleteCategory = useCallback(
@@ -580,9 +568,9 @@ export function useVapor(session, { rangeStart, rangeEnd, onError }) {
         for (const b of Object.values(next)) if (b.category_id === id) next[b.id] = { ...b, category_id: null }
         return next
       })
-      enqueue([id], () => supabase.from('categories').delete().eq('id', id))
+      enqueue([id], () => backend.deleteCategory(id))
     },
-    [commit, enqueue],
+    [backend, commit, enqueue],
   )
 
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])

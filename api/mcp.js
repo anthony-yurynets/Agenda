@@ -3,8 +3,9 @@
 // Auth: `Authorization: Bearer vpr_...` (personal token created in the app).
 
 import { createHash } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
 import { TOOLS, runTool } from './_lib/tools.js'
+import { db } from './_lib/db.js'
+import { send, readBody, bearer } from './_lib/http.js'
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
 const SERVER_INFO = { name: 'vapor', title: 'Vapor Calendar', version: '1.0.0' }
@@ -15,40 +16,10 @@ const INSTRUCTIONS =
   'Any block can be divided into sub-blocks, which must fall on the same date and inside the ' +
   "parent's time range. Call list_categories before creating blocks if you don't know the categories."
 
-let admin
-function db() {
-  if (!admin) {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !key) throw new Error('Server is missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY')
-    admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-  }
-  return admin
-}
-
-function send(res, status, body, headers = {}) {
-  res.statusCode = status
-  for (const [k, v] of Object.entries(headers)) res.setHeader(k, v)
-  if (body === undefined) return res.end()
-  res.setHeader('Content-Type', 'application/json')
-  res.end(JSON.stringify(body))
-}
-
-async function readBody(req) {
-  if (req.body !== undefined && req.body !== null && req.body !== '') {
-    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-  }
-  const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
-  const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : null
-}
-
 async function authenticate(req) {
-  const header = req.headers.authorization || ''
-  const match = /^Bearer\s+(\S+)$/i.exec(header)
-  if (!match) return null
-  const hash = createHash('sha256').update(match[1]).digest('hex')
+  const token = bearer(req)
+  if (!token) return null
+  const hash = createHash('sha256').update(token).digest('hex')
   const { data, error } = await db()
     .from('api_tokens')
     .select('id, user_id')

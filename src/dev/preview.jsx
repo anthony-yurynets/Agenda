@@ -27,19 +27,49 @@ fakeSupabase.tables.blocks.push(
   row({ id: 'gym', title: 'Gym', date: d(-7), start_time: '07:30', end_time: '08:30', category_id: 'c2', repeat: { freq: 'weekly', interval: 1, days: ['mon', 'wed', 'fri'] } }),
   row({ parent_id: 'gym', title: 'Warm-up', date: d(-7), start_time: '07:30', end_time: '07:45', category_id: 'c2' }),
   row({ id: 'school', title: 'School', date: d(-7), start_time: '12:30', end_time: '15:30', category_id: 'c3', status: 'none', repeat: { freq: 'weekly', interval: 1, days: ['mon', 'tue', 'wed', 'thu', 'fri'] } }),
+  row({ id: '22222222-2222-4222-8222-222222222222', title: 'Office hours', date: d(-7), start_time: '15:00', end_time: '17:00', category_id: 'c0', status: 'none', bookable: true, repeat: { freq: 'weekly', interval: 1, days: ['tue', 'thu'] } }),
   row({ title: 'Team sync', date: d(1), start_time: '10:00', end_time: '11:00' }),
   row({ title: '1:1 with Sam', date: d(1), start_time: '10:30', end_time: '11:30', category_id: 'c1', status: 'canceled' }),
   row({ title: 'Read · chapter 4', date: d(2), start_time: '13:00', end_time: '14:00', category_id: 'c3', source: 'ai' }),
   row({ title: 'Deep work', date: d(4), start_time: '08:00', end_time: '11:00', source: 'ai' }),
 )
+const EDIT_TOKEN = 'preview-edit-token-0000000000000'
+const BOOK_TOKEN = 'preview-book-token-0000000000000'
+fakeSupabase.tables.share_links.push(
+  { id: 'l1', user_id: 'u1', kind: 'edit', token: EDIT_TOKEN, name: 'Sam', created_at: new Date().toISOString() },
+  { id: 'l2', user_id: 'u1', kind: 'booking', token: BOOK_TOKEN, name: 'Intro call', slot_minutes: 30, max_uses: 3, uses: 0,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, created_at: new Date().toISOString() },
+)
+for (const b of fakeSupabase.tables.blocks) b.user_id = 'u1'
+for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
 globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase
+globalThis.__VAPOR_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase
 
-const [{ createRoot }, { default: Workspace }] = await Promise.all([
+// Run the real /api/share and /api/book handlers in the page against the fake DB.
+const [{ default: shareApi }, { default: bookApi }] = await Promise.all([import('../../api/share.js'), import('../../api/book.js')])
+const realFetch = window.fetch.bind(window)
+window.fetch = async (url, init = {}) => {
+  const handler = { '/api/share': shareApi, '/api/book': bookApi }[url]
+  if (!handler) return realFetch(url, init)
+  let status = 200
+  let body = ''
+  const res = { setHeader() {}, end: (b) => (body = b ?? ''), set statusCode(v) { status = v } }
+  await handler({ method: 'POST', headers: { authorization: init.headers?.Authorization }, body: JSON.parse(init.body) }, res)
+  return new Response(body, { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { default: BookingPage }] = await Promise.all([
   import('react-dom/client'),
   import('../components/Workspace'),
+  import('../components/SharedWorkspace'),
+  import('../components/BookingPage'),
   import('../index.css'),
   import('../lib/theme'),
 ])
+// ?as=guest → edit-link view, ?as=booker → booking page, default → owner.
+const as = new URLSearchParams(location.search).get('as')
 const session = { user: { id: 'u1', email: 'you@example.com', user_metadata: { full_name: 'Preview User' } } }
-createRoot(document.getElementById('root')).render(<Workspace session={session} />)
+createRoot(document.getElementById('root')).render(
+  as === 'guest' ? <SharedWorkspace token={EDIT_TOKEN} /> : as === 'booker' ? <BookingPage token={BOOK_TOKEN} /> : <Workspace session={session} />,
+)

@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Bot, Repeat } from 'lucide-react'
+import { Bot, CalendarPlus, Repeat, UserRound } from 'lucide-react'
 import { fromMinutes, hasStatus, statusLabel } from '../lib/domain'
 import StatusIcon from './StatusIcon'
 
@@ -37,6 +37,7 @@ function BlockCard({ block, height, depth = 0, ctx, style, onPointerDown, onResi
     isMatch && !isMatch(block) && 'dimmed',
     dragging && 'dragging',
     kids.length > 0 && 'has-kids',
+    block.bookable && depth === 0 && 'bookable',
   ]
     .filter(Boolean)
     .join(' ')
@@ -58,6 +59,8 @@ function BlockCard({ block, height, depth = 0, ctx, style, onPointerDown, onResi
             </span>
             {depth === 0 && (block.virtual || block.recurrence_id) && <Repeat size={11} className="ai-mark" aria-label="Repeats" />}
             {block.source === 'ai' && <Bot size={11} className="ai-mark" aria-label="Added by AI" />}
+            {block.source === 'booking' && <UserRound size={11} className="ai-mark" aria-label="Booked" />}
+            {depth === 0 && block.bookable && <CalendarPlus size={11} className="ai-mark" aria-label="Open for booking" />}
             <StatusIcon status={block.status} size={depth === 0 ? 13 : 11} className="status-fg" />
           </div>
         )}

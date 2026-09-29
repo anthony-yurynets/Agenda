@@ -142,6 +142,7 @@ export const TOOLS = [
         status: { ...statusProp, description: 'Defaults to planned.' },
         notes: { type: 'string' },
         parent_id: { ...idProp, description: 'Create as a sub-block of this block (or occurrence).' },
+        bookable: { type: 'boolean', description: 'Top-level only: let people with a booking link book time inside this block.' },
         repeat: repeatProp,
         sub_blocks: { type: 'array', items: subBlockSchema },
       },
@@ -166,6 +167,7 @@ export const TOOLS = [
         status: statusProp,
         notes: { type: 'string' },
         repeat: repeatProp,
+        bookable: { type: 'boolean', description: 'Top-level only: let people with a booking link book time inside this block.' },
       },
       required: ['id'],
     },
@@ -198,13 +200,13 @@ export const TOOLS = [
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const COPY_FIELDS = ['title', 'start_time', 'end_time', 'category_id', 'status', 'notes', 'source']
+const COPY_FIELDS = ['title', 'start_time', 'end_time', 'category_id', 'status', 'notes', 'source', 'bookable']
 
 function must(cond, message) {
   if (!cond) throw new Error(message)
 }
 
-function unwrap({ data, error }) {
+export function unwrap({ data, error }) {
   if (error) throw new Error(error.message)
   return data
 }
@@ -282,8 +284,39 @@ function virtualTree(root, descendants, date) {
   return out
 }
 
+/** Raw rows the owner's calendar needs for [from, to]: range rows + series templates + their sub-blocks. */
+export async function rawRangeRows(sb, userId, from, to) {
+  const [rangeRows, seriesRows] = await Promise.all([
+    sb
+      .from('blocks')
+      .select('*')
+      .eq('user_id', userId)
+      .or(`and(date.gte.${from},date.lte.${to}),and(recurrence_date.gte.${from},recurrence_date.lte.${to})`)
+      .limit(3000)
+      .then(unwrap),
+    sb.from('blocks').select('*').eq('user_id', userId).not('repeat', 'is', null).lte('date', to).then(unwrap),
+  ])
+  const seriesDesc = await loadDescendants(sb, userId, seriesRows.map((r) => r.id))
+  const byId = new Map([...rangeRows, ...seriesRows, ...seriesDesc].map((r) => [r.id, r]))
+  return { rows: [...byId.values()], rangeRows, seriesRows, seriesDesc }
+}
+
+/** Every block shown in [from, to]: real rows plus virtual occurrences (with occurrence ids). */
+export async function expandedRows(sb, userId, from, to) {
+  const { rangeRows, seriesRows, seriesDesc } = await rawRangeRows(sb, userId, from, to)
+  const templateIds = new Set([...seriesRows, ...seriesDesc].map((r) => r.id))
+  const edited = new Set(rangeRows.filter((r) => r.recurrence_id).map((r) => occurrenceId(r.recurrence_id, r.recurrence_date)))
+  const rows = rangeRows.filter((r) => !templateIds.has(r.id) && r.date >= from && r.date <= to)
+  for (const s of seriesRows) {
+    for (const date of occurrenceDates(s.date, s.repeat, from, to, s.repeat_exdates)) {
+      if (!edited.has(occurrenceId(s.id, date))) rows.push(...virtualTree(s, seriesDesc, date))
+    }
+  }
+  return rows
+}
+
 /** Make one occurrence real (copying its tree) so it can be edited alone. Returns the row for `occId`. */
-async function materialize(sb, userId, occId) {
+export async function materialize(sb, userId, occId) {
   const { templateId, date } = splitOccurrenceId(occId)
   must(UUID_RE.test(templateId) && isValidDate(date), `Invalid occurrence id "${occId}"`)
   const existing = await findException(sb, userId, templateId, date)
@@ -330,6 +363,7 @@ function shape(row, catsById) {
     source: row.source,
     parent_id: row.parent_id,
   }
+  if (row.bookable) out.bookable = true
   if (row.repeat) out.repeat = { ...row.repeat, summary: describeRepeat(row.repeat, row.date) }
   if (row.series_id && !row.parent_id) out.series = { id: row.series_id, repeat: describeRepeat(row.series_rule, row.series_start) }
   if (row.recurrence_id && !row.parent_id) out.series = { id: row.recurrence_id, edited_occurrence: true }
@@ -368,6 +402,7 @@ async function insertTree(sb, userId, spec, ctx, cache) {
     notes: spec.notes ?? '',
     source: 'ai',
     repeat: repeat ?? null,
+    bookable: !parentId && Boolean(spec.bookable),
   }
   must(STATUS_IDS.includes(row.status), `status must be one of ${STATUS_IDS.join(', ')}`)
   const inserted = unwrap(await sb.from('blocks').insert(row).select('*').single())
@@ -443,27 +478,7 @@ const impl = {
     const cache = {}
     const categoryId = await resolveCategory(sb, userId, category, cache)
 
-    const [rangeRows, seriesRows] = await Promise.all([
-      sb
-        .from('blocks')
-        .select('*')
-        .eq('user_id', userId)
-        .or(`and(date.gte.${from},date.lte.${to}),and(recurrence_date.gte.${from},recurrence_date.lte.${to})`)
-        .limit(3000)
-        .then(unwrap),
-      sb.from('blocks').select('*').eq('user_id', userId).not('repeat', 'is', null).lte('date', to).then(unwrap),
-    ])
-    const seriesDesc = await loadDescendants(sb, userId, seriesRows.map((r) => r.id))
-    const templateIds = new Set([...seriesRows, ...seriesDesc].map((r) => r.id))
-    const edited = new Set(rangeRows.filter((r) => r.recurrence_id).map((r) => occurrenceId(r.recurrence_id, r.recurrence_date)))
-
-    const rows = rangeRows.filter((r) => !templateIds.has(r.id) && r.date >= from && r.date <= to)
-    for (const s of seriesRows) {
-      for (const date of occurrenceDates(s.date, s.repeat, from, to, s.repeat_exdates)) {
-        if (!edited.has(occurrenceId(s.id, date))) rows.push(...virtualTree(s, seriesDesc, date))
-      }
-    }
-
+    const rows = await expandedRows(sb, userId, from, to)
     let trees = buildTrees(rows, cache.categories ?? (await loadCategories(sb, userId)))
     if (status) trees = trees.filter((t) => t.status === status)
     if (categoryId) trees = trees.filter((t) => t.category?.id === categoryId)
@@ -530,6 +545,10 @@ const impl = {
       must(isValidDate(args.date), 'date must be YYYY-MM-DD')
       must(!block.parent_id, 'Sub-blocks share their parent’s date; move the parent instead')
       patch.date = args.date
+    }
+    if (args.bookable !== undefined) {
+      must(!block.parent_id, 'Only top-level blocks can be opened for booking')
+      patch.bookable = Boolean(args.bookable)
     }
     if (args.repeat !== undefined) {
       must(!block.parent_id, 'Only top-level blocks can repeat')

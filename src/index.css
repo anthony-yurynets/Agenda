@@ -130,7 +130,7 @@ kbd { font-size: 11px; padding: 1px 5px; border-radius: 5px; background: var(--f
   background: var(--accent); color: #fff; font-size: 11px; display: inline-grid; place-items: center;
 }
 
-input:not([type]), input[type='text'], input[type='date'], input[type='time'], textarea {
+input:not([type]), input[type='text'], input[type='email'], input[type='number'], input[type='date'], input[type='time'], textarea {
   width: 100%; border: 0; background: var(--fill); border-radius: var(--radius-sm);
   padding: 8px 11px; outline: none; box-shadow: inset 0 0 0 1px transparent;
   transition: box-shadow 0.12s, background 0.12s;
@@ -286,7 +286,7 @@ input:disabled { color: var(--muted); }
 .view-area { position: relative; flex: 1; min-height: 0; display: flex; }
 
 /* ─── Week grid ──────────────────────────────────────────────────────────── */
-.week { flex: 1; min-width: 0; display: flex; flex-direction: column; --gutter: 60px; }
+.week { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; --gutter: 60px; }
 .week-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .week-head {
   position: sticky; top: 0; z-index: 20;
@@ -305,6 +305,8 @@ input:disabled { color: var(--muted); }
 .week-body { position: relative; display: grid; grid-template-columns: var(--gutter) 1fr; }
 .gutter { position: relative; }
 .hour-label { position: absolute; right: 10px; transform: translateY(-50%); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hour-label.minor { font-size: 10px; opacity: 0.6; }
+.gutter-head { cursor: default; user-select: none; }
 .now-label {
   position: absolute; right: 5px; transform: translateY(-50%); font-size: 10.5px; font-weight: 600;
   color: #fff; background: var(--accent); padding: 1px 5px; border-radius: 5px; z-index: 3; font-variant-numeric: tabular-nums;
@@ -315,7 +317,7 @@ input:disabled { color: var(--muted); }
   background-image:
     linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--grid-half) 1px, transparent 1px);
-  background-size: 100% 72px, 100% 36px;
+  background-size: 100% var(--hour, 72px), 100% calc(var(--hour, 72px) / 2);
 }
 .day-col.weekend { background-color: color-mix(in srgb, var(--fill) 45%, transparent); }
 .day-col.today { background-color: color-mix(in srgb, var(--accent) 4%, transparent); }
@@ -612,3 +614,91 @@ input:disabled { color: var(--muted); }
 .weekday-toggles button:hover { background: var(--fill-hover); }
 .weekday-toggles button.on { background: var(--btn); color: var(--btn-ink); }
 .bp-foot { gap: 6px; }
+
+/* ─── Zoom ───────────────────────────────────────────────────────────────── */
+.zoom-hint {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 25;
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--glass-solid); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-pop);
+  animation: pop 0.12s ease-out;
+}
+
+/* ─── Sharing & booking ──────────────────────────────────────────────────── */
+.block.top.bookable { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--st) 45%, transparent); }
+.block.top.bookable::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 7px; pointer-events: none;
+  border: 1px dashed color-mix(in srgb, var(--st) 40%, transparent);
+}
+
+.toggle-row {
+  display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 12px;
+  border-radius: 10px; background: var(--fill); cursor: pointer;
+}
+.toggle-row span { flex: 1; display: grid; gap: 2px; }
+.toggle-row strong { font-weight: 500; font-size: 13.5px; }
+.toggle-row small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.switch {
+  appearance: none; flex-shrink: 0; width: 34px; height: 20px; border-radius: 10px; margin: 0;
+  background: var(--fill-hover); position: relative; cursor: pointer; transition: background 0.15s;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.15s;
+}
+.switch:checked { background: var(--accent); box-shadow: none; }
+.switch:checked::after { transform: translateX(14px); }
+
+.guest-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 9px;
+  background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+
+.sharing .panel { display: grid; gap: 4px; }
+.booking-form { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; margin: 14px 0; }
+.booking-form .field-label { margin-top: 0; }
+.booking-form input, .booking-form select { height: 34px; }
+.booking-form select, .sharing select {
+  width: 100%; border: 0; border-radius: var(--radius-sm); background-color: var(--fill); padding: 0 10px; cursor: pointer;
+}
+.token-list li > .link-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.token-list li strong { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.token-list li.is-spent strong { color: var(--muted); }
+
+.booking-screen { min-height: 100%; display: grid; place-items: start center; padding: 40px 16px; }
+.booking-card {
+  width: min(560px, 100%); border-radius: 20px; padding: 26px 26px 22px;
+  background: var(--glass-strong); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-pop);
+}
+.booking-head h1 { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; margin: 22px 0 4px; }
+.booking-head p { display: flex; align-items: center; gap: 5px; margin: 0 0 18px; flex-wrap: wrap; }
+.booking-nav { display: flex; align-items: center; gap: 8px; }
+.booking-nav .icon-btn:disabled { opacity: 0.35; cursor: default; }
+.booking-nav .range-label { flex: 1; text-align: center; margin: 0; }
+.tz-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; }
+.booking-days { display: grid; gap: 16px; margin-top: 16px; transition: opacity 0.15s; }
+.booking-days.is-refreshing { opacity: 0.5; }
+.booking-day h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.slot {
+  height: 38px; border-radius: 9px; font-weight: 500; font-variant-numeric: tabular-nums;
+  background: var(--fill); box-shadow: inset 0 0 0 1px var(--hairline); transition: background 0.1s, box-shadow 0.1s;
+}
+.slot:hover { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); }
+.booking-form-step { display: grid; gap: 4px; }
+.booking-form-step > .btn { justify-self: start; }
+.booking-form-step .btn.primary { margin-top: 14px; height: 40px; }
+.picked-summary { display: grid; gap: 2px; margin: 12px 0 2px; padding: 12px 14px; border-radius: 11px; background: var(--accent-soft); }
+.picked-summary span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.booking-empty, .booking-done { text-align: center; padding: 30px 10px 16px; }
+.booking-empty h2, .booking-done h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+.booking-empty p { margin: 0; }
+.booking-done svg { color: #1ba672; margin-bottom: 8px; }
+.booking-done p { margin: 4px 0; }
+
+@media (max-width: 800px) {
+  .booking-form { grid-template-columns: 1fr 1fr; }
+  .booking-form .field:first-child, .booking-form > .btn { grid-column: 1 / -1; }
+}

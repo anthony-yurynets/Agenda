@@ -249,3 +249,44 @@ export function describeRepeat(repeat, startDate) {
   if (repeat.count) text += `, ${repeat.count} time${repeat.count === 1 ? '' : 's'}`
   return text
 }
+
+// ─── Booking ───────────────────────────────────────────────────────────────
+
+/** Current date + minute-of-day in an IANA time zone (the calendar owner's). */
+export function nowIn(timeZone) {
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(new Date())
+        .map((p) => [p.type, p.value]),
+    )
+    return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) }
+  } catch {
+    const d = new Date()
+    return { date: d.toISOString().slice(0, 10), minutes: d.getUTCHours() * 60 + d.getUTCMinutes() }
+  }
+}
+
+/**
+ * Bookable slots of `slot` minutes inside a window, skipping busy intervals
+ * and anything already in the past.
+ * win = { date, start, end, busy: [[start, end], ...] }
+ */
+export function freeSlots(win, slot, now) {
+  const out = []
+  for (let s = win.start; s + slot <= win.end; s += slot) {
+    const e = s + slot
+    if (now && (win.date < now.date || (win.date === now.date && s <= now.minutes))) continue
+    if (win.busy.some(([bs, be]) => s < be && e > bs)) continue
+    out.push({ start: s, end: e })
+  }
+  return out
+}

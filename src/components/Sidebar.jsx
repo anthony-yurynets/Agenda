@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { CalendarDays, Check, Eye, EyeOff, ListTree, Monitor, Moon, Pencil, Plug, Plus, Sun, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, Eye, EyeOff, ListTree, Monitor, Moon, Pencil, Plug, Plus, Share2, Sun, Trash2, X } from 'lucide-react'
 import { getThemePref, setThemePref } from '../lib/theme'
 import { CATEGORY_PALETTE } from '../lib/domain'
 import Logo from './Logo'
 
-export default function Sidebar({ view, setView, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose }) {
+export default function Sidebar({ view, setView, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest }) {
   const { categories, createCategory, updateCategory, deleteCategory } = store
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -21,8 +21,9 @@ export default function Sidebar({ view, setView, store, hiddenCats, toggleCatego
   const nav = [
     { id: 'calendar', label: 'Calendar', icon: CalendarDays },
     { id: 'list', label: 'Agenda', icon: ListTree },
-    { id: 'integrations', label: 'Integrations', icon: Plug },
-  ]
+    { id: 'sharing', label: 'Sharing', icon: Share2, owner: true },
+    { id: 'integrations', label: 'Integrations', icon: Plug, owner: true },
+  ].filter((n) => !guest || !n.owner)
 
   return (
     <aside className="sidebar">

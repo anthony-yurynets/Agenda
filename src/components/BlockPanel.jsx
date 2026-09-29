@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, CornerDownRight, Plus, Repeat, Scissors, Bot, Trash2, X } from 'lucide-react'
+import { ChevronRight, CornerDownRight, Plus, Repeat, Scissors, Bot, Trash2, UserRound, X } from 'lucide-react'
 import { STATUSES, fromMinutes, toMinutes, describeRepeat } from '../lib/domain'
 import { isInTemplate, seriesOf } from '../lib/recurrence'
 import RepeatEditor from './RepeatEditor'
@@ -110,6 +110,16 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
             <Bot size={13} /> Added via MCP
           </div>
         )}
+        {block.source === 'booking' && (
+          <div className="ai-badge">
+            <UserRound size={13} /> Booked through a booking link
+          </div>
+        )}
+        {block.source === 'shared' && (
+          <div className="ai-badge">
+            <UserRound size={13} /> Added by someone with your edit link
+          </div>
+        )}
 
         <div className="field-label">Status</div>
         <div className="chips">
@@ -167,6 +177,21 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
             <div className="field-label">Repeat</div>
             <RepeatEditor repeat={block.repeat} date={block.date} onChange={(r) => setRepeat(id, r)} />
           </>
+        )}
+
+        {!parent && (
+          <label className="toggle-row">
+            <span>
+              <strong>Open for booking</strong>
+              <small>People with a booking link can pick times inside this block{editingSeries ? ', every time it repeats' : ''}.</small>
+            </span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={!!block.bookable}
+              onChange={(e) => updateBlock(id, { bookable: e.target.checked })}
+            />
+          </label>
         )}
 
         <label className="field">
