@@ -46,6 +46,9 @@ fakeSupabase.tables.share_links.push(
   { id: 'l2', user_id: 'u1', kind: 'booking', token: BOOK_TOKEN, name: 'Intro call', slot_minutes: 30, max_uses: 3, uses: 0,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, created_at: new Date().toISOString() },
 )
+// ?tools=calendar,… sets which tools the preview edit link opens (empty = none).
+const toolsParam = new URLSearchParams(location.search).get('tools')
+if (toolsParam !== null) fakeSupabase.tables.share_links[0].tools = toolsParam ? toolsParam.split(',') : []
 for (const b of fakeSupabase.tables.blocks) b.user_id = 'u1'
 for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
 globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase

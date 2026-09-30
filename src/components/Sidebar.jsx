@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { CalendarDays, Check, Eye, EyeOff, ListTree, Monitor, Moon, Pencil, Plug, Plus, Share2, Sun, Trash2, X } from 'lucide-react'
+import { Check, Eye, EyeOff, Monitor, Moon, Pencil, Plug, Plus, Share2, Sun, Trash2, X } from 'lucide-react'
 import { getThemePref, setThemePref } from '../lib/theme'
 import { CATEGORY_PALETTE } from '../lib/domain'
 import Logo from './Logo'
 
-export default function Sidebar({ view, setView, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest }) {
+/** Sidebar: tools for the current page (categories on Calendar), then settings and theme. */
+export default function Sidebar({ page, setPage, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest, embed }) {
   const { categories, createCategory, updateCategory, deleteCategory } = store
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -18,12 +19,14 @@ export default function Sidebar({ view, setView, store, hiddenCats, toggleCatego
     setAdding(false)
   }
 
-  const nav = [
-    { id: 'calendar', label: 'Calendar', icon: CalendarDays },
-    { id: 'list', label: 'Agenda', icon: ListTree },
-    { id: 'sharing', label: 'Sharing', icon: Share2, owner: true },
-    { id: 'integrations', label: 'Integrations', icon: Plug, owner: true },
-  ].filter((n) => !guest || !n.owner)
+  // Settings screens are owner-only.
+  const settings =
+    guest || embed
+      ? []
+      : [
+          { id: 'sharing', label: 'Sharing', icon: Share2 },
+          { id: 'integrations', label: 'Integrations', icon: Plug },
+        ]
 
   return (
     <aside className="sidebar">
@@ -35,16 +38,8 @@ export default function Sidebar({ view, setView, store, hiddenCats, toggleCatego
         </button>
       </div>
 
-      <nav className="nav">
-        {nav.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={`nav-item ${view === id ? 'active' : ''}`} onClick={() => setView(id)}>
-            <Icon size={18} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      <div className="side-section">
+      {page === 'calendar' && (
+      <div className="side-section first">
         <div className="side-heading">
           <span>Categories</span>
           <button className="icon-btn sm" onClick={() => setAdding(true)} aria-label="Add category">
@@ -108,7 +103,23 @@ export default function Sidebar({ view, setView, store, hiddenCats, toggleCatego
         </ul>
       </div>
 
+      )}
+
       <div className="side-spacer" />
+
+      {settings.length > 0 && (
+        <nav className="nav settings-nav" aria-label="Settings">
+          <div className="side-heading">
+            <span>Settings</span>
+          </div>
+          {settings.map(({ id, label, icon: Icon }) => (
+            <button key={id} className={`nav-item ${page === id ? 'active' : ''}`} onClick={() => setPage(id)}>
+              <Icon size={17} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       <ThemeSwitch />
     </aside>

@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase'
 import { format } from '../lib/dates'
 import { generateToken, linkUrl } from '../lib/shareLinks'
 import LinkList from './LinkList'
+import { SHAREABLE_PAGES } from '../pages'
 const SLOT_OPTIONS = [15, 20, 30, 45, 60, 90, 120]
 const MIGRATION_HINT = 'Run supabase/migrations/0004_sharing.sql in the Supabase SQL editor to enable sharing.'
 
 export default function Sharing({ toast }) {
   const [links, setLinks] = useState(null)
   const [editName, setEditName] = useState('')
+  const [editTools, setEditTools] = useState(() => SHAREABLE_PAGES.map((p) => p.id))
   const [booking, setBooking] = useState({ name: '', slot: 30, uses: 1, expires: '' })
   const [busy, setBusy] = useState(false)
 
@@ -43,6 +45,18 @@ export default function Sharing({ toast }) {
     return data
   }
 
+  // Change which tools an existing edit link opens (takes effect on the guest's next load).
+  const setLinkTools = async (link, tools) => {
+    if (!tools.length) return toast('A link needs at least one tool', 'error')
+    const prev = links
+    setLinks((l) => l.map((x) => (x.id === link.id ? { ...x, tools } : x)))
+    const { error } = await supabase.from('share_links').update({ tools }).eq('id', link.id)
+    if (error) {
+      setLinks(prev)
+      toast(/tools/.test(error.message) ? 'Run supabase/migrations/0008_share_tools.sql first.' : error.message, 'error')
+    }
+  }
+
   const revoke = async (id) => {
     const prev = links
     setLinks((l) => l.filter((x) => x.id !== id))
@@ -72,13 +86,16 @@ export default function Sharing({ toast }) {
           <Users size={17} /> Edit access
         </h3>
         <p className="muted small">
-          Anyone with an edit link can view and change your calendar without signing in. Turn a link off to revoke it.
+          Anyone with an edit link can view and change the tools you pick, without signing in. They only see those tabs.
+          Turn a link off to revoke it.
         </p>
+        <ToolPicker value={editTools} onChange={setEditTools} />
         <form
           className="token-form"
           onSubmit={(e) => {
             e.preventDefault()
-            create({ kind: 'edit', name: editName.trim() }).then((ok) => ok && setEditName(''))
+            if (!editTools.length) return toast('Pick at least one tool to share', 'error')
+            create({ kind: 'edit', name: editName.trim(), tools: editTools }).then((ok) => ok && setEditName(''))
           }}
         >
           <input placeholder="Who is it for? (optional)" value={editName} maxLength={80} onChange={(e) => setEditName(e.target.value)} />
@@ -86,7 +103,14 @@ export default function Sharing({ toast }) {
             <Plus size={16} /> Create link
           </button>
         </form>
-        <LinkList links={editLinks} loading={!links} onCopy={copy} onRevoke={revoke} empty="No edit links yet." />
+        <LinkList
+          links={editLinks}
+          loading={!links}
+          onCopy={copy}
+          onRevoke={revoke}
+          empty="No edit links yet."
+          renderExtra={(l) => <ToolPicker compact value={l.tools ?? ['calendar']} onChange={(tools) => setLinkTools(l, tools)} />}
+        />
       </section>
 
       <section className="panel">
@@ -154,6 +178,26 @@ export default function Sharing({ toast }) {
         </form>
         <LinkList links={bookingLinks} loading={!links} onCopy={copy} onRevoke={revoke} empty="No booking links yet." />
       </section>
+    </div>
+  )
+}
+
+/** Checkboxes for the tools (shareable pages) a link opens. */
+function ToolPicker({ value, onChange, compact = false }) {
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((t) => t !== id) : [...value, id])
+  return (
+    <div className={`tool-picker ${compact ? 'compact' : ''}`} role="group" aria-label="Tools this link opens">
+      {!compact && <span className="field-label">Tools this link opens</span>}
+      <div className="chips">
+        {SHAREABLE_PAGES.map(({ id, label, icon: Icon }) => {
+          const on = value.includes(id)
+          return (
+            <button key={id} type="button" className={`chip tool-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggle(id)}>
+              <Icon size={13} /> {label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

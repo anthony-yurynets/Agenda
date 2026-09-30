@@ -26,10 +26,14 @@ export default jsonEndpoint(async (req, body) => {
   const owner = link.user_id
   const sb = db()
   const blocks = () => sb.from('blocks')
+  // Which tools this link opens. Widget links are calendar-only by nature.
+  const tools = link.kind === 'embed' ? ['calendar'] : (link.tools ?? ['calendar'])
+
+  if (body.op === 'session') return { name: link.name, kind: link.kind, tools, owner: await ownerName(owner) }
+  // Every other op below belongs to the calendar tool.
+  if (!tools.includes('calendar')) throw httpError(403, 'This link doesn’t include the calendar.')
 
   switch (body.op) {
-    case 'session':
-      return { name: link.name, kind: link.kind, owner: await ownerName(owner) }
 
     case 'load': {
       const { from, to } = body

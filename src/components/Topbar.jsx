@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, LogOut, Menu, Search, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-export default function Topbar({ title, subtitle, session, guest, search, setSearch, showSearch, onMenu }) {
+export default function Topbar({ pages, page, onPage, subtitle, session, guest, search, setSearch, showSearch, onMenu }) {
   const user = session?.user
   const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email
   const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
@@ -33,10 +33,29 @@ export default function Topbar({ title, subtitle, session, guest, search, setSea
       <button className="icon-btn only-mobile" onClick={onMenu} aria-label="Open menu">
         <Menu size={20} />
       </button>
-      <div className="page-title">
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
+      {pages ? (
+        <nav className="page-tabs" role="tablist" aria-label="Pages">
+          {pages.map(({ id, label, icon: Icon }, i) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={page === id}
+              className={`page-tab ${page === id ? 'on' : ''}`}
+              onClick={() => onPage(id)}
+              title={`${label} (Alt+${i + 1})`}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+      ) : (
+        <div className="page-title">
+          <h1>Calendar</h1>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+      )}
+      <span className="flex1" />
       {showSearch && (
         <label className="search">
           <Search size={16} />

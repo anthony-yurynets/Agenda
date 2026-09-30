@@ -68,6 +68,27 @@ export function ownerBackend(userId) {
   }
 }
 
+/** No data at all: for a guest whose link doesn't include the calendar. */
+export function emptyBackend() {
+  const ok = async () => ({ data: null })
+  return {
+    kind: 'empty',
+    userId: 'none',
+    canSeedCategories: false,
+    pollMs: 0,
+    loadCategories: async () => ({ data: [] }),
+    loadBlocks: async () => ({ data: [] }),
+    insertBlocks: ok,
+    updateBlock: ok,
+    upsertBlocks: ok,
+    deleteBlock: ok,
+    insertCategories: ok,
+    updateCategory: ok,
+    deleteCategory: ok,
+    subscribe: () => () => {},
+  }
+}
+
 /** Call a share-link API endpoint. Resolves to `{ data }` or `{ error }`. */
 export async function callShareApi(path, token, body) {
   try {

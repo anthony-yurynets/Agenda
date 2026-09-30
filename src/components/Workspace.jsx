@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, List, Menu, Plus, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useVapor } from '../state/useVapor'
-import { addDays, nowMinutes, rangeLabel, toISODate, visibleDays } from '../lib/dates'
+import { addDays, toISODate, visibleDays } from '../lib/dates'
 import { STATUSES } from '../lib/domain'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
-import WeekView from './WeekView'
-import ListView from './ListView'
-import BlockPanel from './BlockPanel'
 import Integrations from './Integrations'
 import Sharing from './Sharing'
-import { ownerBackend } from '../lib/backends'
-import StatusFilter from './StatusFilter'
+import { emptyBackend, ownerBackend } from '../lib/backends'
 import Toasts from './Toasts'
 import { useToasts } from './useToasts'
-import { expandBlocks } from '../lib/recurrence'
+import { PAGES } from '../pages'
+import CalendarPage from '../pages/CalendarPage'
+import TestingPage from '../pages/TestingPage'
+
+// Settings screens reached from the sidebar (not tabs).
+const SETTINGS_PAGES = ['sharing', 'integrations']
 
 const readPref = (key, fallback) => {
   try {
@@ -44,19 +44,34 @@ function useDayCount(fixed) {
 }
 
 /**
- * The main app. Signed-in owners get their own calendar; a guest with an edit
- * link passes `backend` (the share API) and `guest` ({ owner }) instead.
- */
-/**
- * `embed` renders the compact widget layout (Notion): no top bar, the sidebar
- * becomes a slide-out menu, and the toolbar gains search and a day-count switch.
+ * The app shell: sidebar, top bar with page tabs, and the active page.
+ * Signed-in owners get their own data; a guest with an edit link passes
+ * `backend` (the share API) and `guest` ({ owner, tools }) and only sees the
+ * shareable pages their link grants.
+ * `embed` renders the compact widget layout (Notion): no top bar, and the
+ * sidebar becomes a slide-out menu.
  */
 export default function Workspace({ session, backend: backendProp, guest, embed = false }) {
-  const [viewPref, setView] = useState(() => readPref('view', 'calendar'))
-  // Guests only get the calendar and the agenda.
-  const view = guest && !['calendar', 'list'].includes(viewPref) ? 'calendar' : viewPref
+  // Pages this person may open: owners get all, guests the tools on their link,
+  // the Notion widget just the calendar.
+  const pages = useMemo(() => {
+    if (embed) return PAGES.filter((p) => p.id === 'calendar')
+    if (guest) return PAGES.filter((p) => p.shareable && (guest.tools ?? ['calendar']).includes(p.id))
+    return PAGES
+  }, [embed, guest])
+  const limited = Boolean(guest || embed)
+  const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
+  const [pagePref, setPage] = useState(() => readPref('page', 'calendar'))
+  const page = allowed.includes(pagePref) ? pagePref : (pages[0]?.id ?? null)
+  const canCalendar = pages.some((p) => p.id === 'calendar')
+  const [calViewPref, setCalView] = useState(() => readPref('view', 'calendar'))
+  const calView = calViewPref === 'list' ? 'list' : 'calendar'
+
   const userId = session?.user.id
-  const backend = useMemo(() => backendProp ?? ownerBackend(userId), [backendProp, userId])
+  const backend = useMemo(
+    () => (!canCalendar ? emptyBackend() : (backendProp ?? ownerBackend(userId))),
+    [canCalendar, backendProp, userId],
+  )
   const [anchor, setAnchor] = useState(() => new Date())
   const [fixedDays, setFixedDays] = useState(() => (embed ? readPref('embedDays', 0) : 0))
   useEffect(() => {
@@ -67,8 +82,6 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   const rangeStart = toISODate(days[0])
   const rangeEnd = toISODate(days[days.length - 1])
 
-  const [selectedRaw, setSelectedId] = useState(null)
-  const [quickRaw, setQuickId] = useState(null)
   const [hiddenCats, setHiddenCats] = useState(() => new Set(readPref('hiddenCats', [])))
   // Persist the *hidden* statuses so statuses added later show up by default.
   const [statusFilter, setStatusFilter] = useState(() => {
@@ -80,23 +93,14 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   const [navOpen, setNavOpen] = useState(false)
   const { toasts, push: toast, dismiss } = useToasts()
 
+  // Calendar data stays loaded (and live) while you're on other pages.
   const store = useVapor(backend, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
-  const { blocks: rawBlocks, categories } = store
-  // Series templates expanded into occurrences for the visible range.
-  const { display: blocks, aliases } = useMemo(
-    () => expandBlocks(rawBlocks, rangeStart, rangeEnd),
-    [rawBlocks, rangeStart, rangeEnd],
-  )
-  // Occurrences are replaced by real rows once edited (aliases), and a block can
-  // vanish underneath us (deleted by AI, another tab) — treat that as closed.
-  const resolveShown = (id) => {
-    const real = id && (aliases[id] ?? id)
-    return real && blocks[real] ? real : null
-  }
-  const selectedId = resolveShown(selectedRaw)
-  const quickId = resolveShown(quickRaw)
+  const { categories } = store
 
-  useEffect(() => writePref('view', viewPref), [viewPref])
+  useEffect(() => {
+    if (!limited) writePref('page', pagePref)
+  }, [limited, pagePref])
+  useEffect(() => writePref('view', calView), [calView])
   useEffect(() => writePref('hiddenCats', [...hiddenCats]), [hiddenCats])
   useEffect(
     () => writePref('hiddenStatuses', STATUSES.map((s) => s.id).filter((id) => !statusFilter.has(id))),
@@ -108,82 +112,17 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   const defaultCategoryId =
     (activeCategory && categories.some((c) => c.id === activeCategory) && activeCategory) || categories[0]?.id || null
 
-  // What the grid shows: timed top-level blocks, plus the timed sub-blocks of
-  // all-day blocks (a "Conference" day's sessions). All-day blocks themselves
-  // are drawn as day spines.
-  const { timed, allDay } = useMemo(() => {
-    const shown = (b) =>
-      !(b.repeat && !b.virtual) &&
-      b.date >= rangeStart &&
-      b.date <= rangeEnd &&
-      statusFilter.has(b.status) &&
-      !(b.category_id && hiddenCats.has(b.category_id))
-    const timed = []
-    const allDay = []
-    for (const b of Object.values(blocks)) {
-      if (!shown(b)) continue
-      if (!b.parent_id) (b.all_day ? allDay : timed).push(b)
-      else {
-        const p = blocks[b.parent_id]
-        if (p && !p.parent_id && p.all_day && shown(p)) timed.push(b)
-      }
-    }
-    return { timed, allDay }
-  }, [blocks, rangeStart, rangeEnd, statusFilter, hiddenCats])
-  const topLevelCount = allDay.length + timed.filter((b) => !b.parent_id).length
-
-  const step = (dir) => setAnchor((a) => addDays(a, dir * dayCount))
-  const goToday = () => setAnchor(new Date())
-
-  const createAt = useCallback(
-    (date, start, end, allDayBlock = false) => {
-      const id = store.createBlock({ date, start, end, all_day: allDayBlock, category_id: defaultCategoryId })
-      setSelectedId(null)
-      setQuickId(id)
-      return id
-    },
-    [store, defaultCategoryId],
-  )
-
-  const newBlockNow = useCallback(() => {
-    const today = toISODate(new Date())
-    const inRange = today >= rangeStart && today <= rangeEnd
-    const date = inRange ? today : rangeStart
-    const start = inRange ? Math.min(Math.ceil((nowMinutes() + 1) / 30) * 30, 23 * 60) : 9 * 60
-    if (view !== 'calendar') setView('calendar')
-    createAt(date, start, start + 60)
-  }, [createAt, rangeStart, rangeEnd, view])
-
-  // Keyboard shortcuts (ignored while typing).
+  // Alt+1…9 jumps between page tabs (e.code, since Alt changes e.key on macOS).
   useEffect(() => {
     const onKey = (e) => {
-      const t = e.target
-      if (t.closest?.('input, textarea, select, [contenteditable="true"]') || e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key === 'n' || e.key === 'N') {
-        e.preventDefault()
-        newBlockNow()
-      } else if (e.key === 't' || e.key === 'T') goToday()
-      else if (e.key === 'ArrowLeft') step(-1)
-      else if (e.key === 'ArrowRight') step(1)
-      else if (e.key === 'Escape') {
-        setSelectedId(null)
-        setQuickId(null)
-      } else if ((e.key === 'Backspace' || e.key === 'Delete') && selectedId) {
-        store.deleteBlock(selectedId)
-        setSelectedId(null)
-        toast('Block deleted')
-      } else if (e.key === 'c') setView('calendar')
-      else if (e.key === 'l') setView('list')
+      const n = /^Digit([1-9])$/.exec(e.code)?.[1]
+      if (!e.altKey || e.metaKey || e.ctrlKey || !n || !pages[n - 1]) return
+      e.preventDefault()
+      setPage(pages[n - 1].id)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
-
-
-  const openBlock = (id) => {
-    setQuickId(null)
-    setSelectedId(id)
-  }
+  }, [pages])
 
   const toggleCategory = (id) =>
     setHiddenCats((prev) => {
@@ -192,22 +131,56 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
       return next
     })
 
-  const pageMeta = {
-    calendar: ['Calendar', 'Drag on the grid to add a block'],
-    list: ['Agenda', 'Blocks in this range'],
-    sharing: ['Sharing', 'Let others edit your calendar or book time with you'],
-    integrations: ['Integrations', 'Connect AI clients over MCP'],
-  }[view]
-  if (guest) pageMeta[1] = `You're editing ${guest.owner ? `${guest.owner}'s` : 'a shared'} calendar`
+  const goTo = (id) => {
+    setPage(id)
+    setNavOpen(false)
+  }
+
+  let content
+  if (page === 'integrations') content = <Integrations toast={toast} />
+  else if (page === 'sharing') content = <Sharing toast={toast} />
+  else if (page === 'testing') content = <TestingPage />
+  else if (page !== 'calendar') {
+    content = (
+      <section className="panel blank-page">
+        <div className="blank-page-inner">
+          <h2>Nothing shared here</h2>
+          <p className="muted">This link doesn’t include any tools. Ask for a new one.</p>
+        </div>
+      </section>
+    )
+  } else {
+    content = (
+      <CalendarPage
+        store={store}
+        days={days}
+        dayCount={dayCount}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        step={(dir) => setAnchor((a) => addDays(a, dir * dayCount))}
+        goToday={() => setAnchor(new Date())}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        hiddenCats={hiddenCats}
+        search={search}
+        setSearch={setSearch}
+        defaultCategoryId={defaultCategoryId}
+        calView={calView}
+        setCalView={setCalView}
+        embed={embed}
+        fixedDays={fixedDays}
+        setFixedDays={setFixedDays}
+        onMenu={() => setNavOpen(true)}
+        toast={toast}
+      />
+    )
+  }
 
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''} ${embed ? 'embed' : ''}`}>
       <Sidebar
-        view={view}
-        setView={(v) => {
-          setView(v)
-          setNavOpen(false)
-        }}
+        page={page}
+        setPage={goTo}
         store={store}
         hiddenCats={hiddenCats}
         toggleCategory={toggleCategory}
@@ -215,133 +188,24 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
         setActiveCategory={setActiveCategory}
         onClose={() => setNavOpen(false)}
         guest={guest}
+        embed={embed}
       />
       <div className="main">
         {!embed && (
-        <Topbar
-          title={pageMeta[0]}
-          subtitle={pageMeta[1]}
-          session={session}
-          guest={guest}
-          search={search}
-          setSearch={setSearch}
-          showSearch={view === 'calendar' || view === 'list'}
-          onMenu={() => setNavOpen(true)}
-        />
+          <Topbar
+            pages={!limited || pages.length > 1 ? pages : null}
+            page={page}
+            onPage={goTo}
+            subtitle={guest ? `You're editing ${guest.owner ? `${guest.owner}'s` : 'a shared'} calendar` : null}
+            session={session}
+            guest={guest}
+            search={search}
+            setSearch={setSearch}
+            showSearch={page === 'calendar'}
+            onMenu={() => setNavOpen(true)}
+          />
         )}
-        <div className="content">
-          {view === 'integrations' ? (
-            <Integrations toast={toast} />
-          ) : view === 'sharing' ? (
-            <Sharing toast={toast} />
-          ) : (
-            <section className="panel calendar-panel">
-              <div className="toolbar">
-                {embed && (
-                  <button className="icon-btn" onClick={() => setNavOpen(true)} aria-label="Menu: categories and theme">
-                    <Menu size={18} />
-                  </button>
-                )}
-                <div className="segmented" role="tablist">
-                  <button role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
-                    <List size={16} /> List
-                  </button>
-                  <button role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>
-                    <CalendarDays size={16} /> Calendar
-                  </button>
-                </div>
-                <div className="date-nav">
-                  <button className="icon-btn" onClick={() => step(-1)} aria-label="Previous">
-                    <ChevronLeft size={18} />
-                  </button>
-                  <button className="btn ghost today-btn" onClick={goToday}>Today</button>
-                  <button className="icon-btn" onClick={() => step(1)} aria-label="Next">
-                    <ChevronRight size={18} />
-                  </button>
-                  <span className="range-label">{rangeLabel(days)}</span>
-                </div>
-                <div className="toolbar-count">
-                  <strong>{topLevelCount}</strong> block{topLevelCount === 1 ? '' : 's'}
-                  <span className="muted"> {dayCount === 1 ? 'today' : `in ${dayCount} days`}</span>
-                </div>
-                <div className="toolbar-actions">
-                  {embed && (
-                    <>
-                      <div className="segmented small day-switch" role="radiogroup" aria-label="Days shown">
-                        {[
-                          [0, 'Auto'],
-                          [1, 'Day'],
-                          [3, '3 days'],
-                          [7, 'Week'],
-                        ].map(([n, label]) => (
-                          <button key={n} role="radio" aria-checked={fixedDays === n} className={fixedDays === n ? 'on' : ''} onClick={() => setFixedDays(n)}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      <label className="search compact">
-                        <Search size={15} />
-                        <input
-                          placeholder="Search"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Escape' && (setSearch(''), e.currentTarget.blur())}
-                        />
-                      </label>
-                    </>
-                  )}
-                  <StatusFilter value={statusFilter} onChange={setStatusFilter} />
-                  <button className="btn primary" onClick={newBlockNow} title="New block (N)">
-                    <Plus size={16} /> <span className="hide-sm">New block</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="view-area">
-                {view === 'calendar' ? (
-                  <WeekView
-                    days={days}
-                    store={store}
-                    blocks={blocks}
-                    visible={timed}
-                    allDay={allDay}
-                    search={search}
-                    selectedId={selectedId}
-                    quickId={quickId}
-                    onSelect={openBlock}
-                    onCreate={createAt}
-                    onCreateAllDay={(date) => createAt(date, 0, 24 * 60, true)}
-                    onQuickClose={() => setQuickId(null)}
-                    onQuickExpand={(id) => openBlock(id)}
-                    toast={toast}
-                  />
-                ) : (
-                  <ListView
-                    days={days}
-                    store={store}
-                    blocks={blocks}
-                    visible={[...allDay, ...timed.filter((b) => !b.parent_id)]}
-                    search={search}
-                    selectedId={selectedId}
-                    onSelect={openBlock}
-                    onNew={newBlockNow}
-                  />
-                )}
-                {selectedId && (
-                  <BlockPanel
-                    key={selectedRaw}
-                    id={selectedId}
-                    store={store}
-                    blocks={blocks}
-                    onSelect={openBlock}
-                    onClose={() => setSelectedId(null)}
-                    toast={toast}
-                  />
-                )}
-              </div>
-            </section>
-          )}
-        </div>
+        <div className="content">{content}</div>
       </div>
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
       <Toasts toasts={toasts} dismiss={dismiss} />

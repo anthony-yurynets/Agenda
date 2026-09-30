@@ -29,5 +29,5 @@ export default function SharedWorkspace({ token }) {
       </div>
     )
   }
-  return <Workspace backend={backend} guest={{ owner: state.info.owner }} />
+  return <Workspace backend={backend} guest={{ owner: state.info.owner, tools: state.info.tools ?? ['calendar'] }} />
 }

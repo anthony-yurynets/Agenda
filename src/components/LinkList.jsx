@@ -3,7 +3,7 @@ import { Check, Copy, Link2, Trash2 } from 'lucide-react'
 import { format } from '../lib/dates'
 import { linkUrl } from '../lib/shareLinks'
 
-export default function LinkList({ links, loading, onCopy, onRevoke, empty, actions }) {
+export default function LinkList({ links, loading, onCopy, onRevoke, empty, actions, renderExtra }) {
   const [copied, setCopied] = useState(null)
   if (loading) return <p className="muted small">Loading…</p>
   return (
@@ -27,6 +27,7 @@ export default function LinkList({ links, loading, onCopy, onRevoke, empty, acti
                 )}
                 {expired ? 'expired' : l.expires_at ? `expires ${format(new Date(l.expires_at), 'MMM d')}` : `created ${format(new Date(l.created_at), 'MMM d')}`}
               </small>
+              {renderExtra?.(l)}
             </div>
             <div className="link-actions">
               {actions ? (

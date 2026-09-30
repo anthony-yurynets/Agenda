@@ -1,6 +1,10 @@
 # Vapor
 
-A time-block calendar with nested blocks, Google sign-in, a Supabase backend, and an MCP server so AI assistants can plan alongside you.
+A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
+server so AI assistants can plan alongside you.
+
+- **Pages:** tabs across the top (Calendar, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+  in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
   Fixed commitments (sleep, school) can use **No status**: shown in neutral grey with nothing to tick off.
@@ -21,7 +25,7 @@ A time-block calendar with nested blocks, Google sign-in, a Supabase backend, an
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0007_widget_rpc.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0008_share_tools.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -54,7 +58,8 @@ that id to `update_block` or `delete_block` affects only that date. Passing the 
 
 Open **Sharing** in the sidebar.
 
-- **Edit links** (`/s/<token>`): anyone with the link can view and edit your calendar, no sign-in. Guests' changes
+- **Edit links** (`/s/<token>`): pick which tools (shareable pages) the link opens; anyone with it can view and edit
+  just those, no sign-in, and only sees those tabs. Change a link's tools any time. Guests' changes
   reach you instantly; they see yours within a few seconds. Delete the link to revoke access.
 - **Booking links** (`/b/<token>`): choose a slot length, how many bookings the link allows, and optionally an expiry
   date. Visitors see only free slots (never your block titles) inside blocks you've switched to **Open for booking**

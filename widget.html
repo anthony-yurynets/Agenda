@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vapor</title>
     <script>
+      // Show fatal errors on the page itself: inside Notion there's no easy console.
+      function vaporFatal(msg) {
+        var el = document.getElementById('vapor-fatal') || document.body.appendChild(document.createElement('pre'))
+        el.id = 'vapor-fatal'
+        el.style.cssText = 'margin:16px;padding:12px;border-radius:10px;background:#fde0e0;color:#8a1c1c;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap'
+        el.textContent += (el.textContent ? '\n' : 'Vapor widget error:\n') + msg
+      }
+      window.addEventListener('error', function (e) { vaporFatal(String(e.error && e.error.stack || e.message)) })
+      window.addEventListener('unhandledrejection', function (e) { vaporFatal(String(e.reason && e.reason.stack || e.reason)) })
       try {
         var p = localStorage.getItem('vapor:theme') || 'system'
         var d = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
