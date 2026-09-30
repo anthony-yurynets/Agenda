@@ -14,7 +14,9 @@ const INSTRUCTIONS =
   '(HH:MM, 24h, local time), a category and a status (planned, in_progress, done, canceled, or none for ' +
   'fixed commitments like sleep or school). ' +
   'Any block can be divided into sub-blocks, which must fall on the same date and inside the ' +
-  "parent's time range. Call list_categories before creating blocks if you don't know the categories."
+  "parent's time range. Call list_categories before creating blocks if you don't know the categories. " +
+  'Fitness: call get_fitness_summary first (recovery per muscle, weekly goal, weekday-only schedule), then ' +
+  'create_workout to plan sessions; the user logs sets in the app, or you can with log_sets.'
 
 async function authenticate(req) {
   const token = bearer(req)

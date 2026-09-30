@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the parts of supabase-js the app uses.
-const tables = { blocks: [], categories: [], api_tokens: [], share_links: [] }
+const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [] }
 let clock = 0
 const stamp = () => new Date(Date.UTC(2026, 0, 1) + ++clock).toISOString()
 
@@ -20,7 +20,7 @@ function test(row, { col, op, val }) {
 
 class Query {
   constructor(table) { this.table = table; this.filters = []; this.op = 'select' }
-  select() { return this }
+  select(cols) { this.cols = cols ?? '*'; return this }
   order() { return this }
   limit() { return this }
   single() { this.one = true; return this }
@@ -54,7 +54,8 @@ class Query {
       return { data: this.one ? rows[0] : rows, error: null }
     }
     if (this.op === 'upsert') {
-      for (const r of this.rows) { const i = t.findIndex((x) => x.id === r.id); i >= 0 ? (t[i] = { ...t[i], ...r }) : t.push({ ...r }) }
+      const key = (x) => x.id ?? x.user_id
+      for (const r of this.rows) { const i = t.findIndex((x) => key(x) === key(r)); i >= 0 ? (t[i] = { ...t[i], ...r }) : t.push({ ...r }) }
       return { data: this.rows, error: null }
     }
     if (this.op === 'update') { t.filter(match).forEach((r) => Object.assign(r, this.patch)); return { data: null, error: null } }
@@ -63,9 +64,23 @@ class Query {
       let grew = true
       while (grew) { grew = false; for (const r of t) if (!doomed.has(r.id) && (doomed.has(r.parent_id) || doomed.has(r.recurrence_id))) { doomed.add(r.id); grew = true } }
       tables[this.table] = t.filter((r) => !doomed.has(r.id))
+      if (this.table === 'workouts') tables.workout_exercises = tables.workout_exercises.filter((e) => !doomed.has(e.workout_id))
+      if (this.table === 'workouts' || this.table === 'workout_exercises') {
+        const ex = new Set(tables.workout_exercises.map((e) => e.id))
+        tables.workout_sets = tables.workout_sets.filter((x) => ex.has(x.exercise_id))
+      }
       return { data: null, error: null }
     }
-    const data = t.filter(match).map((r) => ({ ...r }))
+    let data = t.filter(match).map((r) => ({ ...r }))
+    // Minimal embedded-select support for the fitness query.
+    if (this.table === 'workouts' && /workout_exercises\(/.test(this.cols ?? '')) {
+      data = data.map((w) => ({
+        ...w,
+        workout_exercises: tables.workout_exercises
+          .filter((e) => e.workout_id === w.id)
+          .map((e) => ({ ...e, workout_sets: tables.workout_sets.filter((x) => x.exercise_id === e.id).map((x) => ({ ...x })) })),
+      }))
+    }
     return { data: this.one ? data[0] ?? null : data, error: null }
   }
 }

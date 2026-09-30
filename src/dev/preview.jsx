@@ -51,6 +51,36 @@ const toolsParam = new URLSearchParams(location.search).get('tools')
 if (toolsParam !== null) fakeSupabase.tables.share_links[0].tools = toolsParam ? toolsParam.split(',') : []
 for (const b of fakeSupabase.tables.blocks) b.user_id = 'u1'
 for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
+// Fitness sample data: a few weeks of weekday training plus an AI-planned session.
+{
+  const T = fakeSupabase.tables
+  const day = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
+  const plans = {
+    Push: [['Bench press', ['chest', 'triceps', 'deltoids'], 135, 8], ['Overhead press', ['deltoids', 'triceps'], 85, 8], ['Triceps pushdown', ['triceps'], 50, 12]],
+    Pull: [['Pull-ups', ['upper-back', 'biceps'], 0, 8], ['Barbell row', ['upper-back', 'biceps', 'forearm'], 115, 8], ['Curls', ['biceps', 'forearm'], 30, 12]],
+    Legs: [['Squat', ['quadriceps', 'gluteal', 'adductors'], 185, 6], ['Romanian deadlift', ['hamstring', 'gluteal', 'lower-back'], 155, 8], ['Calf raise', ['calves'], 90, 15]],
+  }
+  const order = ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs']
+  let k = 0
+  for (let n = -24; n <= 0; n++) {
+    const date = day(n)
+    const dow = new Date(`${date}T12:00`).getDay()
+    if (dow === 0 || dow === 6 || (n % 7 === -3 && n < -7)) continue // weekdays, ~4/week
+    const name = order[k++ % order.length]
+    const wid = crypto.randomUUID()
+    const doneToday = n === 0 ? false : true
+    T.workouts.push({ id: wid, user_id: 'u1', title: `${name} day`, date, status: doneToday ? 'done' : 'planned', notes: '', source: 'user',
+      completed_at: doneToday ? new Date(`${date}T18:00`).toISOString() : null, created_at: new Date().toISOString() })
+    plans[name].forEach(([ex, muscles, w, reps], i) => {
+      const eid = crypto.randomUUID()
+      T.workout_exercises.push({ id: eid, user_id: 'u1', workout_id: wid, name: ex, muscles, position: i, notes: '' })
+      for (let j = 0; j < 3; j++) T.workout_sets.push({ id: crypto.randomUUID(), user_id: 'u1', exercise_id: eid, position: j, reps, weight: w ? w + Math.round((n + 24) / 6) * 5 : null, done: doneToday || (i === 0 && j < 2) })
+    })
+  }
+  const ai = crypto.randomUUID()
+  T.workouts.push({ id: ai, user_id: 'u1', title: 'Upper hypertrophy', date: day(1), status: 'planned', notes: 'Planned by your AI', source: 'ai', completed_at: null, created_at: new Date().toISOString() })
+  T.workout_exercises.push({ id: crypto.randomUUID(), user_id: 'u1', workout_id: ai, name: 'Incline dumbbell press', muscles: ['chest', 'deltoids'], position: 0, notes: '' })
+}
 globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase
 globalThis.__VAPOR_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useVapor } from '../state/useVapor'
 import { addDays, toISODate, visibleDays } from '../lib/dates'
 import { STATUSES } from '../lib/domain'
@@ -12,6 +12,8 @@ import { useToasts } from './useToasts'
 import { PAGES } from '../pages'
 import CalendarPage from '../pages/CalendarPage'
 import TestingPage from '../pages/TestingPage'
+// Heavy (body-map SVGs): loaded when the tab is first opened.
+const FitnessPage = lazy(() => import('../pages/FitnessPage'))
 
 // Settings screens reached from the sidebar (not tabs).
 const SETTINGS_PAGES = ['sharing', 'integrations']
@@ -140,6 +142,13 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   if (page === 'integrations') content = <Integrations toast={toast} />
   else if (page === 'sharing') content = <Sharing toast={toast} />
   else if (page === 'testing') content = <TestingPage />
+  else if (page === 'fitness') {
+    content = (
+      <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
+        <FitnessPage session={session} toast={toast} />
+      </Suspense>
+    )
+  }
   else if (page !== 'calendar') {
     content = (
       <section className="panel blank-page">

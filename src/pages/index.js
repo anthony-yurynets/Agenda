@@ -1,4 +1,4 @@
-import { CalendarDays, FlaskConical } from 'lucide-react'
+import { CalendarDays, Dumbbell, FlaskConical } from 'lucide-react'
 
 /**
  * Top-level pages, shown as tabs in the top bar (in this order). To add a page:
@@ -8,6 +8,7 @@ import { CalendarDays, FlaskConical } from 'lucide-react'
  */
 export const PAGES = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, shareable: true },
+  { id: 'fitness', label: 'Fitness', icon: Dumbbell, shareable: false },
   { id: 'testing', label: 'Testing', icon: FlaskConical, shareable: false },
 ]
 

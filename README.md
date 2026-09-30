@@ -3,7 +3,7 @@
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
 
-- **Pages:** tabs across the top (Calendar, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+- **Pages:** tabs across the top (Calendar, Fitness, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
   in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0008_share_tools.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0009_fitness.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -53,6 +53,20 @@ and an optional `repeat` rule), `update_block`, `divide_block`, `delete_block`.
 
 Repeating blocks appear in `list_blocks` once per occurrence, with ids like `<series id>::2026-10-05`. Passing
 that id to `update_block` or `delete_block` affects only that date. Passing the series id affects every occurrence.
+
+## Fitness
+
+A bento dashboard: a body map colored by how recovered each muscle is (fresh → fatigued, with "fresh in ~Xh"),
+a frosted workout timeline, this week's weekday sessions against your goal, a weekly streak, today's plan or a
+suggestion from what's recovered, sets per muscle over 7 days, and personal records. Open a workout to log reps,
+weight and completed sets; "Last time" shows your previous numbers for each exercise.
+
+Recovery: each completed set adds fatigue to its muscles (main muscle 1.0, others 0.5) that fades exponentially,
+slower for big muscles (see [`src/lib/fitness.js`](src/lib/fitness.js)).
+
+Your AI can plan and log workouts over MCP: `get_fitness_summary` (start here), `list_workouts`, `get_workout`,
+`create_workout`, `update_workout`, `add_exercise`, `update_exercise`, `log_sets`, `delete_workout`,
+`delete_exercise`. Try: *"Look at my recovery and plan my workouts for next week, weekdays only."*
 
 ## Sharing
 

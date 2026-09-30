@@ -22,6 +22,7 @@ import {
   splitOccurrenceId,
   occurrenceId,
 } from '../../src/lib/domain.js'
+import { FITNESS_TOOLS, fitnessImpl } from './fitnessTools.js'
 
 const timeProp = (desc) => ({ type: 'string', pattern: '^\\d{1,2}:\\d{2}$', description: desc })
 const statusProp = {
@@ -658,7 +659,10 @@ const impl = {
   },
 }
 
+// Fitness tools live in their own module.
+TOOLS.push(...FITNESS_TOOLS)
+
 export function runTool(sb, userId, name, args) {
-  return impl[name](sb, userId, args ?? {})
+  return (impl[name] ?? fitnessImpl[name])(sb, userId, args ?? {})
 }
 
