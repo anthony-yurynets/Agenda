@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, KeyRound, Plus, ShieldCheck, Trash2, Wrench } from 'lucide-react'
+import { Check, Copy, Download, KeyRound, LayoutPanelTop, Plus, ShieldCheck, Trash2, Wrench } from 'lucide-react'
+import { buildWidgetFile, downloadBlob, generateToken as shareToken } from '../lib/shareLinks'
+import { supabaseAnonKey, supabaseUrl } from '../lib/supabase'
+import LinkList from './LinkList'
 import { supabase } from '../lib/supabase'
 import { format } from '../lib/dates'
 
@@ -100,6 +103,8 @@ export default function Integrations({ toast }) {
         </div>
       </section>
 
+      <NotionWidget toast={toast} />
+
       <div className="int-grid">
         <section className="panel">
           <h3><KeyRound size={17} /> Access tokens</h3>
@@ -198,5 +203,81 @@ function CopyField({ value, mono, block }) {
         {copied ? <Check size={15} /> : <Copy size={15} />}
       </button>
     </div>
+  )
+}
+
+/** Links for the Notion widget (/embed). Each works like a private edit link. */
+function NotionWidget({ toast }) {
+  const [links, setLinks] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    supabase
+      .from('share_links')
+      .select('*')
+      .eq('kind', 'embed')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) toast(/share_links/.test(error.message) ? 'Run the sharing migrations (0004, 0006) to enable the widget.' : error.message, 'error')
+        setLinks(data ?? [])
+      })
+  }, [toast])
+
+  const download = async (link) => {
+    try {
+      const blob = await buildWidgetFile(link, { url: supabaseUrl, key: supabaseAnonKey })
+      downloadBlob(blob, 'vapor-widget.html')
+      toast('Widget file downloaded — add it to your Notion page')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  const create = async () => {
+    setBusy(true)
+    const { data, error } = await supabase
+      .from('share_links')
+      .insert({ kind: 'embed', name: 'Notion widget', token: shareToken(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+      .select('*')
+      .single()
+    setBusy(false)
+    if (error) return toast(/kind_check/.test(error.message) ? 'Run supabase/migrations/0006_widget_links.sql first.' : error.message, 'error')
+    setLinks((l) => [data, ...(l ?? [])])
+    download(data)
+  }
+
+  const revoke = async (id) => {
+    const prev = links
+    setLinks((l) => l.filter((x) => x.id !== id))
+    const { error } = await supabase.from('share_links').delete().eq('id', id)
+    if (error) {
+      setLinks(prev)
+      toast(error.message, 'error')
+    } else toast('Widget link turned off')
+  }
+
+  return (
+    <section className="panel">
+      <h3>
+        <LayoutPanelTop size={17} /> Notion widget
+      </h3>
+      <p className="muted small">
+        Your full calendar as a single <code>.html</code> file you can add to a Notion page (drag the file in, or use
+        Notion’s HTML block). It opens without signing in, so keep that page private. Turning a widget off here stops
+        its file from working.
+      </p>
+      <div className="token-form">
+        <button className="btn primary" onClick={create} disabled={busy}>
+          <Download size={16} /> Download widget file
+        </button>
+      </div>
+      <LinkList
+        links={links ?? []}
+        loading={!links}
+        onRevoke={revoke}
+        empty="No widgets yet."
+        action={{ label: 'Download again', icon: <Download size={14} />, onClick: download }}
+      />
+    </section>
   )
 }

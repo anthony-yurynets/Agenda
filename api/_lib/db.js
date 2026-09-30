@@ -15,10 +15,11 @@ export function db() {
   return admin
 }
 
-/** Look up an active share link by its token. */
+/** Look up an active share link by its token. `kind` may be one kind or a list. */
 export async function findShareLink(token, kind) {
   if (typeof token !== 'string' || token.length < 24) return null
-  const { data, error } = await db().from('share_links').select('*').eq('token', token).eq('kind', kind).maybeSingle()
+  const kinds = Array.isArray(kind) ? kind : [kind]
+  const { data, error } = await db().from('share_links').select('*').eq('token', token).in('kind', kinds).maybeSingle()
   if (error || !data) return null
   if (data.revoked_at) return null
   if (data.expires_at && new Date(data.expires_at) <= new Date()) return null

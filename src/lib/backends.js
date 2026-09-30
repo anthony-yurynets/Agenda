@@ -116,3 +116,43 @@ export function sharedBackend(token) {
     subscribe: () => () => {},
   }
 }
+
+/**
+ * The standalone Notion widget file: talks straight to Supabase database
+ * functions (widget_load / widget_write) with the public anon key and a widget
+ * token, so it works from any host — including Notion's.
+ */
+export function widgetBackend(client, token) {
+  const write = async (op, payload) => {
+    const { data, error } = await client.rpc('widget_write', { p_token: token, p_op: op, p_payload: payload })
+    return error ? { error } : { data }
+  }
+  let cache = null
+  return {
+    kind: 'widget',
+    userId: 'widget',
+    canSeedCategories: false,
+    pollMs: 5000,
+
+    async loadBlocks(from, to) {
+      const { data, error } = await client.rpc('widget_load', { p_token: token, p_from: from, p_to: to })
+      if (error) return { error }
+      cache = data.categories
+      return { data: data.blocks, categories: data.categories }
+    },
+    async loadCategories() {
+      if (cache) return { data: cache }
+      const today = new Date().toISOString().slice(0, 10)
+      const res = await this.loadBlocks(today, today)
+      return res.error ? res : { data: res.categories }
+    },
+    insertBlocks: (rows) => write('insert', { rows }),
+    updateBlock: (id, patch) => write('update', { id, patch }),
+    upsertBlocks: (rows) => write('upsert', { rows }),
+    deleteBlock: (id) => write('delete', { id }),
+    insertCategories: (rows) => write('category.insert', { rows }),
+    updateCategory: (id, patch) => write('category.update', { id, patch }),
+    deleteCategory: (id) => write('category.delete', { id }),
+    subscribe: () => () => {},
+  }
+}

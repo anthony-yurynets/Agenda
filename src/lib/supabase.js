@@ -9,5 +9,9 @@ const fake = import.meta.env.DEV ? globalThis.__VAPOR_FAKE_SUPABASE__ : null
 
 export const isConfigured = Boolean(fake || (url && anonKey))
 
+/** Public connection details (the anon/publishable key is safe to share; RLS protects data). */
+export const supabaseUrl = url
+export const supabaseAnonKey = anonKey
+
 export const supabase =
   fake ?? (url && anonKey ? createClient(url, anonKey, { auth: { persistSession: true, detectSessionInUrl: true } }) : null)

@@ -21,7 +21,7 @@ A time-block calendar with nested blocks, Google sign-in, a Supabase backend, an
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0005_all_day.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0007_widget_rpc.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -63,6 +63,17 @@ Open **Sharing** in the sidebar.
 
 Guests never access the database directly: `api/share.js` and `api/book.js` check the token and act on your behalf
 with the service-role key.
+
+## Notion widget
+
+Open **Integrations → Notion widget → Download widget file**. You get `vapor-widget.html`: one self-contained
+file with the whole calendar (grid, agenda, quick-create, sub-blocks, repeats, all-day spines, zoom, categories,
+themes — everything except sharing and integrations). Add it to a Notion page and resize it.
+
+The file talks to Supabase directly through the `widget_load` / `widget_write` database functions using a widget
+token, so it needs no server and works wherever Notion hosts it. Anyone who has the file can edit your calendar;
+keep the page private, and turn the widget off in Integrations to revoke it. The template is built by
+`npm run build:widget` (also run automatically by `npm run dev` and `npm run build`).
 
 ## Shortcuts
 

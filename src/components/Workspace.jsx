@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, List, Plus } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, List, Menu, Plus, Search } from 'lucide-react'
 import { useVapor } from '../state/useVapor'
 import { addDays, nowMinutes, rangeLabel, toISODate, visibleDays } from '../lib/dates'
 import { STATUSES } from '../lib/domain'
@@ -31,7 +31,8 @@ const writePref = (key, value) => {
   }
 }
 
-function useDayCount() {
+/** Days to show: picked from the width, unless the user chose a fixed number. */
+function useDayCount(fixed) {
   const pick = () => (window.innerWidth < 640 ? 1 : window.innerWidth < 1100 ? 3 : 7)
   const [n, setN] = useState(pick)
   useEffect(() => {
@@ -39,21 +40,29 @@ function useDayCount() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  return n
+  return fixed || n
 }
 
 /**
  * The main app. Signed-in owners get their own calendar; a guest with an edit
  * link passes `backend` (the share API) and `guest` ({ owner }) instead.
  */
-export default function Workspace({ session, backend: backendProp, guest }) {
+/**
+ * `embed` renders the compact widget layout (Notion): no top bar, the sidebar
+ * becomes a slide-out menu, and the toolbar gains search and a day-count switch.
+ */
+export default function Workspace({ session, backend: backendProp, guest, embed = false }) {
   const [viewPref, setView] = useState(() => readPref('view', 'calendar'))
   // Guests only get the calendar and the agenda.
   const view = guest && !['calendar', 'list'].includes(viewPref) ? 'calendar' : viewPref
   const userId = session?.user.id
   const backend = useMemo(() => backendProp ?? ownerBackend(userId), [backendProp, userId])
   const [anchor, setAnchor] = useState(() => new Date())
-  const dayCount = useDayCount()
+  const [fixedDays, setFixedDays] = useState(() => (embed ? readPref('embedDays', 0) : 0))
+  useEffect(() => {
+    if (embed) writePref('embedDays', fixedDays)
+  }, [embed, fixedDays])
+  const dayCount = useDayCount(fixedDays)
   const days = useMemo(() => visibleDays(anchor, dayCount), [anchor, dayCount])
   const rangeStart = toISODate(days[0])
   const rangeEnd = toISODate(days[days.length - 1])
@@ -192,7 +201,7 @@ export default function Workspace({ session, backend: backendProp, guest }) {
   if (guest) pageMeta[1] = `You're editing ${guest.owner ? `${guest.owner}'s` : 'a shared'} calendar`
 
   return (
-    <div className={`app ${navOpen ? 'nav-open' : ''}`}>
+    <div className={`app ${navOpen ? 'nav-open' : ''} ${embed ? 'embed' : ''}`}>
       <Sidebar
         view={view}
         setView={(v) => {
@@ -208,6 +217,7 @@ export default function Workspace({ session, backend: backendProp, guest }) {
         guest={guest}
       />
       <div className="main">
+        {!embed && (
         <Topbar
           title={pageMeta[0]}
           subtitle={pageMeta[1]}
@@ -218,6 +228,7 @@ export default function Workspace({ session, backend: backendProp, guest }) {
           showSearch={view === 'calendar' || view === 'list'}
           onMenu={() => setNavOpen(true)}
         />
+        )}
         <div className="content">
           {view === 'integrations' ? (
             <Integrations toast={toast} />
@@ -226,6 +237,11 @@ export default function Workspace({ session, backend: backendProp, guest }) {
           ) : (
             <section className="panel calendar-panel">
               <div className="toolbar">
+                {embed && (
+                  <button className="icon-btn" onClick={() => setNavOpen(true)} aria-label="Menu: categories and theme">
+                    <Menu size={18} />
+                  </button>
+                )}
                 <div className="segmented" role="tablist">
                   <button role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
                     <List size={16} /> List
@@ -249,6 +265,31 @@ export default function Workspace({ session, backend: backendProp, guest }) {
                   <span className="muted"> {dayCount === 1 ? 'today' : `in ${dayCount} days`}</span>
                 </div>
                 <div className="toolbar-actions">
+                  {embed && (
+                    <>
+                      <div className="segmented small day-switch" role="radiogroup" aria-label="Days shown">
+                        {[
+                          [0, 'Auto'],
+                          [1, 'Day'],
+                          [3, '3 days'],
+                          [7, 'Week'],
+                        ].map(([n, label]) => (
+                          <button key={n} role="radio" aria-checked={fixedDays === n} className={fixedDays === n ? 'on' : ''} onClick={() => setFixedDays(n)}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="search compact">
+                        <Search size={15} />
+                        <input
+                          placeholder="Search"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Escape' && (setSearch(''), e.currentTarget.blur())}
+                        />
+                      </label>
+                    </>
+                  )}
                   <StatusFilter value={statusFilter} onChange={setStatusFilter} />
                   <button className="btn primary" onClick={newBlockNow} title="New block (N)">
                     <Plus size={16} /> <span className="hide-sm">New block</span>

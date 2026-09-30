@@ -20,7 +20,8 @@ const pick = (obj, fields) => Object.fromEntries(fields.filter((f) => obj?.[f] !
 const asArray = (v) => (Array.isArray(v) ? v : [])
 
 export default jsonEndpoint(async (req, body) => {
-  const link = await findShareLink(bearer(req), 'edit')
+  // Edit links and Notion widget links both grant full access to the calendar.
+  const link = await findShareLink(bearer(req), ['edit', 'embed'])
   if (!link) throw httpError(401, 'This share link is invalid or has been turned off.')
   const owner = link.user_id
   const sb = db()
@@ -28,7 +29,7 @@ export default jsonEndpoint(async (req, body) => {
 
   switch (body.op) {
     case 'session':
-      return { name: link.name, owner: await ownerName(owner) }
+      return { name: link.name, kind: link.kind, owner: await ownerName(owner) }
 
     case 'load': {
       const { from, to } = body

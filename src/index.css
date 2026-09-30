@@ -757,3 +757,26 @@ input:disabled { color: var(--muted); }
   background: color-mix(in srgb, var(--cat) 14%, var(--fill)); font-weight: 500; font-size: 13px;
 }
 .field-row:has(.allday-field) { grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr); }
+
+/* ─── Embed / Notion widget ──────────────────────────────────────────────── */
+/* Match Notion's page backgrounds and drop the app chrome so it sits flat. */
+:root.embed[data-theme='light'] { --bg: #ffffff; }
+:root.embed[data-theme='dark'] { --bg: #191919; }
+.app.embed { padding: 0; gap: 0; }
+.app.embed .main { gap: 0; }
+.app.embed .content { border-radius: 0; }
+.app.embed .calendar-panel { border-radius: 0; box-shadow: none; background: transparent; }
+.app.embed .toolbar { padding: 8px 10px; gap: 8px; }
+.app.embed .sidebar {
+  position: fixed; top: 8px; bottom: 8px; left: 8px; z-index: 90; background: var(--glass-solid);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  transform: translateX(calc(-100% - 16px)); transition: transform 0.2s ease;
+}
+.app.embed.nav-open .sidebar { transform: none; }
+.app.embed .scrim { display: block; position: fixed; inset: 0; background: rgba(10, 12, 16, 0.25); z-index: 80; }
+.app.embed .only-mobile { display: inline-grid !important; }
+.search.compact { width: 150px; height: 32px; }
+.day-switch button { padding: 0 9px; }
+@media (max-width: 1000px) { .app.embed .toolbar-count { display: none; } }
+@media (max-width: 760px) { .app.embed .day-switch { display: none; } .search.compact { width: 110px; } }
+@media (max-width: 520px) { .search.compact { display: none; } }
