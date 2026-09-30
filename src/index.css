@@ -702,3 +702,58 @@ input:disabled { color: var(--muted); }
   .booking-form { grid-template-columns: 1fr 1fr; }
   .booking-form .field:first-child, .booking-form > .btn { grid-column: 1 / -1; }
 }
+
+/* ─── All-day blocks: day spines ─────────────────────────────────────────── */
+/* The whole day takes on a wash of the (first) all-day block's category. */
+.day-col.has-allday { background-color: color-mix(in srgb, var(--allday) 6%, transparent); }
+.day-col.has-allday.today { background-color: color-mix(in srgb, var(--allday) 8%, color-mix(in srgb, var(--accent) 4%, transparent)); }
+
+.spine {
+  position: absolute; top: 4px; bottom: 4px; width: 21px; z-index: 3; cursor: pointer; touch-action: none;
+  border-radius: 11px;
+  background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cat) 35%, transparent);
+  transition: box-shadow 0.12s, opacity 0.12s, transform 0.12s;
+  animation: block-in 0.16s ease-out;
+}
+/* Category color runs down the spine like the stitching on a book. */
+.spine::before {
+  content: ''; position: absolute; left: 50%; top: 10px; bottom: 10px; width: 1.5px; margin-left: -0.75px;
+  border-radius: 1px; background: repeating-linear-gradient(to bottom, var(--cat) 0 6px, transparent 6px 11px); opacity: 0.55;
+}
+.spine:hover { box-shadow: inset 0 0 0 1.5px var(--cat), var(--shadow); }
+.spine.selected { box-shadow: inset 0 0 0 1.5px var(--cat), 0 0 0 3px color-mix(in srgb, var(--cat) 25%, transparent); z-index: 6; }
+.spine.dimmed { opacity: 0.3; }
+.spine.dragging { opacity: 0.85; box-shadow: var(--shadow-pop); cursor: grabbing; transition: none; }
+.spine-label {
+  position: sticky; top: 52px; z-index: 1;
+  writing-mode: vertical-rl; display: flex; align-items: center; gap: 6px;
+  width: 21px; padding: 9px 0; max-height: min(60vh, calc(100% - 8px));
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink);
+  background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid); border-radius: 11px;
+}
+.spine-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spine-label svg { flex-shrink: 0; }
+.s-canceled .spine-label span { text-decoration: line-through; color: var(--ink-2); }
+
+.day-head { position: relative; cursor: default; user-select: none; }
+.allday-marks { position: absolute; left: 0; right: 0; bottom: 4px; display: flex; justify-content: center; gap: 3px; pointer-events: none; }
+.allday-marks i { width: 14px; height: 3px; border-radius: 2px; background: var(--cat); }
+.allday-marks i.s-done, .allday-marks i.s-canceled { opacity: 0.4; }
+
+.list-time .allday-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2);
+  padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--cat) 16%, transparent); white-space: nowrap;
+}
+.list-row.allday { background: linear-gradient(var(--st-bg), var(--st-bg)), color-mix(in srgb, var(--cat) 7%, var(--glass-solid)); }
+.quick-when { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.allday-switch { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+.allday-switch .switch { width: 30px; height: 18px; }
+.allday-switch .switch::after { width: 14px; height: 14px; }
+.allday-switch .switch:checked::after { transform: translateX(12px); }
+.allday-field { display: grid; }
+.allday-chip {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--cat) 14%, var(--fill)); font-weight: 500; font-size: 13px;
+}
+.field-row:has(.allday-field) { grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr); }

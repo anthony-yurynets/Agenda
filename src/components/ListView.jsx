@@ -85,7 +85,7 @@ function Row({ block, depth, childrenMap, store, selectedId, onSelect, collapsed
   return (
     <li>
       <div
-        className={`list-row s-${block.status} ${selectedId === block.id ? 'selected' : ''} ${depth ? 'nested' : ''}`}
+        className={`list-row s-${block.status} ${selectedId === block.id ? 'selected' : ''} ${depth ? 'nested' : ''} ${block.all_day ? 'allday' : ''}`}
         style={{ '--cat': cat?.color ?? '#94a3b8', '--depth': depth }}
         onClick={() => onSelect(block.id)}
       >
@@ -105,8 +105,14 @@ function Row({ block, depth, childrenMap, store, selectedId, onSelect, collapsed
         </span>
         <span className="list-bar" />
         <span className="list-time">
-          {fromMinutes(block.start)}
-          <small>{fromMinutes(block.end)}</small>
+          {block.all_day ? (
+            <span className="allday-tag">All day</span>
+          ) : (
+            <>
+              {fromMinutes(block.start)}
+              <small>{fromMinutes(block.end)}</small>
+            </>
+          )}
         </span>
         <span className="list-main">
           <span className="list-title">

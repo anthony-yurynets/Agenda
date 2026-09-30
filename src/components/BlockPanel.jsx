@@ -44,6 +44,14 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
     moveBlock(id, { date: block.date, start, end })
   }
 
+  const setAllDay = (on) => {
+    if (on) return updateBlock(id, { all_day: true, bookable: false, start: 0, end: 24 * 60 })
+    // Back to a timed block: wrap its sessions if it has any, else 09:00–10:00.
+    const start = kids.length ? Math.min(...kids.map((k) => k.start)) : 9 * 60
+    const end = kids.length ? Math.max(...kids.map((k) => k.end)) : 10 * 60
+    updateBlock(id, { all_day: false, start, end })
+  }
+
   const setDate = (value) => {
     if (!value || parent) return
     moveBlock(id, { date: value, start: block.start, end: block.end })
@@ -155,20 +163,38 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
             <span className="field-label">Date</span>
             <input type="date" value={block.date} disabled={!!parent} onChange={(e) => setDate(e.target.value)} />
           </label>
-          <label className="field">
-            <span className="field-label">Start</span>
-            <input type="time" step={300} value={fromMinutes(block.start)} onChange={(e) => setTime('start', e.target.value)} />
-          </label>
-          <label className="field">
-            <span className="field-label">End</span>
-            <input
-              type="time"
-              step={300}
-              value={block.end === 1440 ? '23:59' : fromMinutes(block.end)}
-              onChange={(e) => setTime('end', e.target.value === '23:59' ? '24:00' : e.target.value)}
-            />
-          </label>
+          {block.all_day ? (
+            <div className="field allday-field">
+              <span className="field-label">Time</span>
+              <span className="allday-chip">All day</span>
+            </div>
+          ) : (
+            <>
+              <label className="field">
+                <span className="field-label">Start</span>
+                <input type="time" step={300} value={fromMinutes(block.start)} onChange={(e) => setTime('start', e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">End</span>
+                <input
+                  type="time"
+                  step={300}
+                  value={block.end === 1440 ? '23:59' : fromMinutes(block.end)}
+                  onChange={(e) => setTime('end', e.target.value === '23:59' ? '24:00' : e.target.value)}
+                />
+              </label>
+            </>
+          )}
         </div>
+        {!parent && (
+          <label className="toggle-row">
+            <span>
+              <strong>All day</strong>
+              <small>Shown as a ribbon down the whole day. Its sub-blocks can still have times.</small>
+            </span>
+            <input type="checkbox" className="switch" checked={!!block.all_day} onChange={(e) => setAllDay(e.target.checked)} />
+          </label>
+        )}
         {parent && <p className="field-hint">Sub-blocks share their parent’s date.</p>}
         {editingSeries && !parent && <p className="field-hint">The date is when the series starts.</p>}
 
@@ -179,7 +205,7 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
           </>
         )}
 
-        {!parent && (
+        {!parent && !block.all_day && (
           <label className="toggle-row">
             <span>
               <strong>Open for booking</strong>

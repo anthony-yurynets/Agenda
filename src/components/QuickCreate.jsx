@@ -76,7 +76,23 @@ export default function QuickCreate({ block, store, style, onClose, onExpand }) 
         onKeyDown={onKeyDown}
       />
       <div className="quick-when">
-        {format(fromISODate(block.date), 'EEE, MMM d')} · {fromMinutes(block.start)} – {fromMinutes(block.end)}
+        <span>
+          {format(fromISODate(block.date), 'EEE, MMM d')} ·{' '}
+          {block.all_day ? 'All day' : `${fromMinutes(block.start)} – ${fromMinutes(block.end)}`}
+        </span>
+        <label className="allday-switch">
+          All day
+          <input
+            type="checkbox"
+            className="switch"
+            checked={!!block.all_day}
+            onChange={(e) => {
+              // A new block has no sub-blocks, so switching back just restores an hour.
+              updateBlock(block.id, e.target.checked ? { all_day: true, start: 0, end: 24 * 60 } : { all_day: false, start: 9 * 60, end: 10 * 60 })
+              inputRef.current?.focus()
+            }}
+          />
+        </label>
       </div>
 
       <div className="field-label">Category</div>

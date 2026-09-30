@@ -45,7 +45,7 @@ class Query {
     const match = (r) => this.filters.every((f) => f(r))
     if (this.op === 'insert') {
       const defaults = this.table === 'blocks'
-        ? { parent_id: null, notes: '', status: 'planned', source: 'user', repeat: null, repeat_exdates: [], recurrence_id: null, recurrence_date: null, category_id: null, bookable: false }
+        ? { parent_id: null, notes: '', status: 'planned', source: 'user', repeat: null, repeat_exdates: [], recurrence_id: null, recurrence_date: null, category_id: null, bookable: false, all_day: false }
         : this.table === 'share_links'
           ? { uses: 0, created_at: new Date().toISOString(), expires_at: null, revoked_at: null }
           : {}

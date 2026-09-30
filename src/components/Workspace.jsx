@@ -99,26 +99,36 @@ export default function Workspace({ session, backend: backendProp, guest }) {
   const defaultCategoryId =
     (activeCategory && categories.some((c) => c.id === activeCategory) && activeCategory) || categories[0]?.id || null
 
-  const visibleTopLevel = useMemo(
-    () =>
-      Object.values(blocks).filter(
-        (b) =>
-          !b.parent_id &&
-          !(b.repeat && !b.virtual) &&
-          b.date >= rangeStart &&
-          b.date <= rangeEnd &&
-          statusFilter.has(b.status) &&
-          !(b.category_id && hiddenCats.has(b.category_id)),
-      ),
-    [blocks, rangeStart, rangeEnd, statusFilter, hiddenCats],
-  )
+  // What the grid shows: timed top-level blocks, plus the timed sub-blocks of
+  // all-day blocks (a "Conference" day's sessions). All-day blocks themselves
+  // are drawn as day spines.
+  const { timed, allDay } = useMemo(() => {
+    const shown = (b) =>
+      !(b.repeat && !b.virtual) &&
+      b.date >= rangeStart &&
+      b.date <= rangeEnd &&
+      statusFilter.has(b.status) &&
+      !(b.category_id && hiddenCats.has(b.category_id))
+    const timed = []
+    const allDay = []
+    for (const b of Object.values(blocks)) {
+      if (!shown(b)) continue
+      if (!b.parent_id) (b.all_day ? allDay : timed).push(b)
+      else {
+        const p = blocks[b.parent_id]
+        if (p && !p.parent_id && p.all_day && shown(p)) timed.push(b)
+      }
+    }
+    return { timed, allDay }
+  }, [blocks, rangeStart, rangeEnd, statusFilter, hiddenCats])
+  const topLevelCount = allDay.length + timed.filter((b) => !b.parent_id).length
 
   const step = (dir) => setAnchor((a) => addDays(a, dir * dayCount))
   const goToday = () => setAnchor(new Date())
 
   const createAt = useCallback(
-    (date, start, end) => {
-      const id = store.createBlock({ date, start, end, category_id: defaultCategoryId })
+    (date, start, end, allDayBlock = false) => {
+      const id = store.createBlock({ date, start, end, all_day: allDayBlock, category_id: defaultCategoryId })
       setSelectedId(null)
       setQuickId(id)
       return id
@@ -235,7 +245,7 @@ export default function Workspace({ session, backend: backendProp, guest }) {
                   <span className="range-label">{rangeLabel(days)}</span>
                 </div>
                 <div className="toolbar-count">
-                  <strong>{visibleTopLevel.length}</strong> block{visibleTopLevel.length === 1 ? '' : 's'}
+                  <strong>{topLevelCount}</strong> block{topLevelCount === 1 ? '' : 's'}
                   <span className="muted"> {dayCount === 1 ? 'today' : `in ${dayCount} days`}</span>
                 </div>
                 <div className="toolbar-actions">
@@ -252,12 +262,14 @@ export default function Workspace({ session, backend: backendProp, guest }) {
                     days={days}
                     store={store}
                     blocks={blocks}
-                    visible={visibleTopLevel}
+                    visible={timed}
+                    allDay={allDay}
                     search={search}
                     selectedId={selectedId}
                     quickId={quickId}
                     onSelect={openBlock}
                     onCreate={createAt}
+                    onCreateAllDay={(date) => createAt(date, 0, 24 * 60, true)}
                     onQuickClose={() => setQuickId(null)}
                     onQuickExpand={(id) => openBlock(id)}
                     toast={toast}
@@ -267,7 +279,7 @@ export default function Workspace({ session, backend: backendProp, guest }) {
                     days={days}
                     store={store}
                     blocks={blocks}
-                    visible={visibleTopLevel}
+                    visible={[...allDay, ...timed.filter((b) => !b.parent_id)]}
                     search={search}
                     selectedId={selectedId}
                     onSelect={openBlock}

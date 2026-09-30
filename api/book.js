@@ -23,8 +23,10 @@ const remaining = (link) => (link.max_uses ? Math.max(link.max_uses - link.uses,
 /** Free slots per day in [from, to] for this link. */
 async function availability(sb, link, from, to) {
   const rows = await expandedRows(sb, link.user_id, from, to)
-  const active = rows.filter((r) => r.status !== 'canceled')
-  const top = active.filter((r) => !r.parent_id)
+  // All-day blocks (birthdays, trips…) don't block out time; their timed sub-blocks do.
+  const active = rows.filter((r) => r.status !== 'canceled' && !r.all_day)
+  const allDayIds = new Set(rows.filter((r) => r.all_day).map((r) => r.id))
+  const top = active.filter((r) => !r.parent_id || allDayIds.has(r.parent_id))
   const now = nowIn(link.timezone)
   const days = new Map()
 

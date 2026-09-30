@@ -4,6 +4,9 @@ A time-block calendar with nested blocks, Google sign-in, a Supabase backend, an
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
   Fixed commitments (sleep, school) can use **No status**: shown in neutral grey with nothing to tick off.
+- **All-day blocks** are drawn as *day spines*: a slim ribbon down the right edge of the day with its title set
+  vertically (it stays pinned while you scroll), and the whole day takes on the category's color. Double-click a day's
+  header to add one. Give an all-day block timed sub-blocks (a conference's sessions) and they appear in the grid.
 - **Divide** any block into sub-blocks, and those into more, as deep as you like.
 - **Repeats:** daily, weekdays, weekends, any set of weekdays, every N days/weeks/months/years, monthly on a date or
   on the Nth weekday ("2nd Tuesday", "last Friday"), yearly; ending never, on a date, or after N times. Editing one occurrence
@@ -18,7 +21,7 @@ A time-block calendar with nested blocks, Google sign-in, a Supabase backend, an
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0004_sharing.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0005_all_day.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.

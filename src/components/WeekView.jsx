@@ -4,6 +4,8 @@ import { format, isSameDay, nowMinutes, toISODate } from '../lib/dates'
 import { buildChildrenMap, layoutOverlaps } from '../lib/tree'
 import BlockCard from './BlockCard'
 import QuickCreate from './QuickCreate'
+import StatusIcon from './StatusIcon'
+import { Repeat } from 'lucide-react'
 
 // Vertical zoom: pixels per minute. Pinch (trackpad / touch) or Ctrl+scroll changes it.
 const DEFAULT_PPM = 1.2
@@ -37,7 +39,7 @@ function useNow() {
   return now
 }
 
-export default function WeekView({ days, store, blocks, visible, search, selectedId, quickId, onSelect, onCreate, onQuickClose, onQuickExpand }) {
+export default function WeekView({ days, store, blocks, visible, allDay = [], search, selectedId, quickId, onSelect, onCreate, onCreateAllDay, onQuickClose, onQuickExpand }) {
   const { categoriesById, moveBlock } = store
   const scrollRef = useRef(null)
   const colsRef = useRef(null)
@@ -201,6 +203,17 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
     return map
   }, [visible, preview, dayISO])
 
+  // All-day blocks per day (drawn as spines), also following a drag preview.
+  const allDayByDay = useMemo(() => {
+    const map = new Map(dayISO.map((d) => [d, []]))
+    for (const b of allDay) {
+      const eff = preview?.id === b.id ? { ...b, ...preview } : b
+      map.get(eff.date)?.push(eff)
+    }
+    for (const list of map.values()) list.sort((a, b) => a.title.localeCompare(b.title))
+    return map
+  }, [allDay, preview, dayISO])
+
   // ── Geometry helpers ──
   const minutesAt = (clientY) => (clientY - colsRef.current.getBoundingClientRect().top) / ppm
   const dayAt = (clientX) => {
@@ -280,7 +293,8 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
         const dy = snapNear((ev.clientY - y0) / ppm)
         if (mode === 'move') {
           const start = clamp(block.start + dy, 0, DAY_MINUTES - dur)
-          next = { id: block.id, date: dayISO[dayAt(ev.clientX)], start, end: start + dur }
+          // Sessions inside an all-day block stay on its day.
+          next = { id: block.id, date: block.parent_id ? block.date : dayISO[dayAt(ev.clientX)], start, end: start + dur }
         } else {
           next = { id: block.id, date: block.date, start: block.start, end: clamp(block.end + dy, block.start + SNAP, DAY_MINUTES) }
         }
@@ -296,6 +310,29 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
     })
   }
 
+  /** Spines: click to open, drag sideways to move to another day. */
+  const startSpineGesture = (e, block) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    const x0 = e.clientX
+    let moved = false
+    let date = block.date
+    beginGesture({
+      move: (ev) => {
+        if (!moved && Math.abs(ev.clientX - x0) < 6) return
+        moved = true
+        date = dayISO[dayAt(ev.clientX)]
+        setPreview({ id: block.id, date })
+      },
+      up: () => {
+        setPreview(null)
+        if (!moved) return onSelect(block.id)
+        if (date !== block.date) moveBlock(block.id, { date, start: block.start, end: block.end })
+      },
+    })
+  }
+
   const quickBlock = quickId ? blocks[quickId] : null
   const quickDay = quickBlock ? dayISO.indexOf(quickBlock.date) : -1
 
@@ -304,12 +341,37 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
       <div className="week-scroll" ref={scrollRef}>
         <div className="week-head" ref={headRef}>
           <div className="gutter-head" onDoubleClick={resetZoom} title="Pinch or Ctrl+scroll to zoom · double-click to reset">{Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace('_', ' ')}</div>
-          {days.map((d, i) => (
-            <div key={dayISO[i]} className={`day-head ${i === todayIndex ? 'today' : ''}`}>
-              <span className="dow">{format(d, 'EEE')}</span>
-              <span className="dom">{format(d, 'd')}</span>
-            </div>
-          ))}
+          {days.map((d, i) => {
+            const spines = allDayByDay.get(dayISO[i]) ?? []
+            return (
+              <div
+                key={dayISO[i]}
+                className={`day-head ${i === todayIndex ? 'today' : ''}`}
+                onDoubleClick={() => onCreateAllDay?.(dayISO[i])}
+                title="Double-click to add an all-day block"
+              >
+                <span className="dow">{format(d, 'EEE')}</span>
+                <span className="dom">{format(d, 'd')}</span>
+                {spines.length > 0 && (
+                  <span className="allday-marks" aria-label={`${spines.length} all-day`}>
+                    {spines.map((b) => (
+                      <i key={b.id} className={`s-${b.status}`} style={{ '--cat': categoriesById.get(b.category_id)?.color ?? '#94a3b8' }} />
+                    ))}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+          {quickBlock?.all_day && quickDay >= 0 && (
+            <QuickCreate
+              key={quickBlock.id}
+              block={quickBlock}
+              store={store}
+              style={quickHeaderPosition(quickDay, days.length)}
+              onClose={onQuickClose}
+              onExpand={() => onQuickExpand(quickBlock.id)}
+            />
+          )}
         </div>
 
         <div className="week-body" style={{ height: DAY_MINUTES * ppm }}>
@@ -330,12 +392,28 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
             {days.map((d, i) => {
               const list = byDay.get(dayISO[i]) ?? []
               const layout = layoutOverlaps(list)
+              const spines = allDayByDay.get(dayISO[i]) ?? []
+              const reserve = spines.length * SPINE_STEP // room kept free for spines on the right
+              const tint = spines[0] && categoriesById.get(spines[0].category_id)?.color
               return (
                 <div
                   key={dayISO[i]}
-                  className={`day-col ${i === todayIndex ? 'today' : ''} ${d.getDay() % 6 === 0 ? 'weekend' : ''}`}
+                  className={`day-col ${i === todayIndex ? 'today' : ''} ${d.getDay() % 6 === 0 ? 'weekend' : ''} ${spines.length ? 'has-allday' : ''}`}
+                  style={tint ? { '--allday': tint } : undefined}
                   onPointerDown={(e) => startCreate(e, i)}
                 >
+                  {spines.map((b, n) => (
+                    <DaySpine
+                      key={b.id}
+                      block={b}
+                      index={n}
+                      color={categoriesById.get(b.category_id)?.color}
+                      selected={selectedId === b.id}
+                      dimmed={isMatch && !isMatch(b)}
+                      dragging={preview?.id === b.id}
+                      onPointerDown={(e) => startSpineGesture(e, b)}
+                    />
+                  ))}
                   {list.map((b) => {
                     const { col, cols } = layout.get(b.id) ?? { col: 0, cols: 1 }
                     const height = Math.max((b.end - b.start) * ppm - 3, 18)
@@ -349,8 +427,8 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
                         style={{
                           top: b.start * ppm + 1,
                           height,
-                          left: `calc(${(col / cols) * 100}% + 4px)`,
-                          width: `calc(${100 / cols}% - 8px)`,
+                          left: `calc((100% - ${reserve}px) * ${col / cols} + 4px)`,
+                          width: `calc((100% - ${reserve}px) / ${cols} - 8px)`,
                         }}
                         onPointerDown={(e) => startBlockGesture(e, b, 'move')}
                         onResizeStart={(e) => startBlockGesture(e, b, 'resize')}
@@ -373,7 +451,7 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
               )
             })}
 
-            {quickBlock && quickDay >= 0 && (
+            {quickBlock && !quickBlock.all_day && quickDay >= 0 && (
               <QuickCreate
                 key={quickBlock.id}
                 block={quickBlock}
@@ -398,6 +476,39 @@ export default function WeekView({ days, store, blocks, visible, search, selecte
       )}
     </div>
   )
+}
+
+const SPINE_STEP = 25 // px per spine (21px wide + gap)
+
+/**
+ * An all-day block: a slim ribbon down the right edge of its day, title set
+ * vertically and pinned to the top of the view while you scroll.
+ */
+function DaySpine({ block, index, color, selected, dimmed, dragging, onPointerDown }) {
+  return (
+    <div
+      className={`spine s-${block.status} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''}`}
+      style={{ right: 4 + index * SPINE_STEP, '--cat': color ?? '#94a3b8' }}
+      data-block-id={block.id}
+      onPointerDown={onPointerDown}
+      title={`${block.title || 'Untitled'} · all day`}
+    >
+      <div className="spine-label">
+        <StatusIcon status={block.status} size={12} className="status-fg" />
+        {(block.virtual || block.recurrence_id) && <Repeat size={11} className="ai-mark" />}
+        <span>{block.title || 'Untitled'}</span>
+      </div>
+    </div>
+  )
+}
+
+/** Quick editor for a new all-day block: hangs below the sticky header. */
+function quickHeaderPosition(dayIndex, dayCount) {
+  if (dayCount === 1) return { top: 'calc(100% + 6px)', right: 12 }
+  const toRight = dayCount === 7 ? dayIndex < 5 : dayIndex < dayCount / 2
+  const frac = (toRight ? dayIndex : dayIndex + 1) / dayCount
+  const x = `calc(var(--gutter) + (100% - var(--gutter)) * ${frac})`
+  return toRight ? { top: 'calc(100% + 6px)', left: `calc(${x} + 6px)` } : { top: 'calc(100% + 6px)', left: `calc(${x} - 322px)` }
 }
 
 function quickPosition(dayIndex, dayCount, start, ppm) {

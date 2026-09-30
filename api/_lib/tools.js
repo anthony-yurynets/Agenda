@@ -143,6 +143,7 @@ export const TOOLS = [
         notes: { type: 'string' },
         parent_id: { ...idProp, description: 'Create as a sub-block of this block (or occurrence).' },
         bookable: { type: 'boolean', description: 'Top-level only: let people with a booking link book time inside this block.' },
+        all_day: { type: 'boolean', description: 'Top-level only: an all-day block (birthday, trip, deadline). start_time/end_time are ignored; sub-blocks can still have times.' },
         repeat: repeatProp,
         sub_blocks: { type: 'array', items: subBlockSchema },
       },
@@ -168,6 +169,7 @@ export const TOOLS = [
         notes: { type: 'string' },
         repeat: repeatProp,
         bookable: { type: 'boolean', description: 'Top-level only: let people with a booking link book time inside this block.' },
+        all_day: { type: 'boolean', description: 'Top-level only: make it an all-day block (true) or a timed one (false, then give start_time/end_time).' },
       },
       required: ['id'],
     },
@@ -200,7 +202,7 @@ export const TOOLS = [
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const COPY_FIELDS = ['title', 'start_time', 'end_time', 'category_id', 'status', 'notes', 'source', 'bookable']
+const COPY_FIELDS = ['title', 'start_time', 'end_time', 'category_id', 'status', 'notes', 'source', 'bookable', 'all_day']
 
 function must(cond, message) {
   if (!cond) throw new Error(message)
@@ -364,6 +366,11 @@ function shape(row, catsById) {
     parent_id: row.parent_id,
   }
   if (row.bookable) out.bookable = true
+  if (row.all_day) {
+    out.all_day = true
+    delete out.start_time
+    delete out.end_time
+  }
   if (row.repeat) out.repeat = { ...row.repeat, summary: describeRepeat(row.repeat, row.date) }
   if (row.series_id && !row.parent_id) out.series = { id: row.series_id, repeat: describeRepeat(row.series_rule, row.series_start) }
   if (row.recurrence_id && !row.parent_id) out.series = { id: row.recurrence_id, edited_occurrence: true }
@@ -402,7 +409,8 @@ async function insertTree(sb, userId, spec, ctx, cache) {
     notes: spec.notes ?? '',
     source: 'ai',
     repeat: repeat ?? null,
-    bookable: !parentId && Boolean(spec.bookable),
+    bookable: !parentId && !spec.all_day && Boolean(spec.bookable),
+    all_day: !parentId && Boolean(spec.all_day),
   }
   must(STATUS_IDS.includes(row.status), `status must be one of ${STATUS_IDS.join(', ')}`)
   const inserted = unwrap(await sb.from('blocks').insert(row).select('*').single())
@@ -508,8 +516,13 @@ const impl = {
     } else {
       must(isValidDate(args.date), 'date (YYYY-MM-DD) is required for top-level blocks')
       date = args.date
-      start = parseTime(args.start_time, 'start_time')
-      end = args.end_time ? parseTime(args.end_time, 'end_time') : Math.min(start + 60, 1440)
+      if (args.all_day) {
+        start = 0
+        end = 1440
+      } else {
+        start = parseTime(args.start_time, 'start_time')
+        end = args.end_time ? parseTime(args.end_time, 'end_time') : Math.min(start + 60, 1440)
+      }
     }
     must(end > start, 'end_time must be after start_time')
     const repeat = args.repeat ? normalizeRepeat(args.repeat, date) : null
@@ -531,6 +544,24 @@ const impl = {
     const cat = await resolveCategory(sb, userId, args.category, cache)
     if (cat !== undefined) patch.category_id = cat
 
+    if (args.all_day !== undefined) {
+      must(!block.parent_id, 'Only top-level blocks can be all-day')
+      patch.all_day = Boolean(args.all_day)
+      if (patch.all_day) {
+        patch.bookable = false
+        args = { ...args, start_time: '00:00', end_time: '24:00' }
+      } else if (!args.start_time) {
+        // Back to timed: wrap existing sessions, else 09:00–10:00.
+        const kids = unwrap(await sb.from('blocks').select('start_time, end_time').eq('user_id', userId).eq('parent_id', block.id))
+        args = kids.length
+          ? {
+              ...args,
+              start_time: fromMinutes(Math.min(...kids.map((k) => toMinutes(k.start_time)))),
+              end_time: fromMinutes(Math.max(...kids.map((k) => toMinutes(k.end_time)))),
+            }
+          : { ...args, start_time: '09:00', end_time: args.end_time ?? '10:00' }
+      }
+    }
     const oldStart = toMinutes(block.start_time)
     const oldEnd = toMinutes(block.end_time)
     const newStart = args.start_time ? parseTime(args.start_time, 'start_time') : oldStart
@@ -567,8 +598,9 @@ const impl = {
     unwrap(await sb.from('blocks').update(patch).eq('user_id', userId).eq('id', block.id))
 
     // Carry sub-blocks along (shift by delta, clamp into the new range).
-    const delta = newStart - oldStart
-    if (delta !== 0 || patch.date || newEnd !== oldEnd) {
+    // (Switching all-day on/off keeps sessions where they are.)
+    const delta = args.all_day !== undefined ? 0 : newStart - oldStart
+    if (delta !== 0 || patch.date || (newEnd !== oldEnd && args.all_day === undefined)) {
       const desc = await loadDescendants(sb, userId, [block.id])
       for (const d of desc) {
         let s = toMinutes(d.start_time) + delta

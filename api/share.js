@@ -11,7 +11,7 @@ import { isValidDate } from '../src/lib/domain.js'
 
 const BLOCK_FIELDS = [
   'id', 'parent_id', 'title', 'date', 'start_time', 'end_time', 'category_id', 'status', 'notes',
-  'repeat', 'repeat_exdates', 'recurrence_id', 'recurrence_date', 'bookable',
+  'repeat', 'repeat_exdates', 'recurrence_id', 'recurrence_date', 'bookable', 'all_day',
 ]
 const PATCH_FIELDS = BLOCK_FIELDS.filter((f) => f !== 'id')
 const CATEGORY_FIELDS = ['id', 'name', 'color', 'position']

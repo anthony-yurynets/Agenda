@@ -26,6 +26,7 @@ const fromRow = (r) => ({
   recurrence_id: r.recurrence_id ?? null,
   recurrence_date: r.recurrence_date ?? null,
   bookable: r.bookable ?? false,
+  all_day: r.all_day ?? false,
 })
 
 const toRow = (b, userId) => ({
@@ -45,6 +46,7 @@ const toRow = (b, userId) => ({
   recurrence_id: b.recurrence_id ?? null,
   recurrence_date: b.recurrence_date ?? null,
   bookable: b.bookable ?? false,
+  all_day: b.all_day ?? false,
 })
 
 const patchToRow = (patch) => {
@@ -111,7 +113,7 @@ export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
       .catch((err) => {
         rollback?.()
         const msg = err.message ?? 'Something went wrong'
-        errorRef.current?.(/repeat|recurrence|bookable|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
+        errorRef.current?.(/repeat|recurrence|bookable|all_day|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
       })
       .finally(() => ids.forEach(release))
   }, [])
