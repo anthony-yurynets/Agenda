@@ -47,8 +47,8 @@ export default function WidgetApp({ config }) {
     return (
       <Notice title="Widget not connected">
         <p className="muted">
-          This file doesn’t have a widget link inside it. In Vapor, open <strong>Integrations → Notion widget</strong> and use{' '}
-          <strong>Download widget file</strong>, then add that file to Notion.
+          This widget link is missing its key. In Vapor, open <strong>Integrations → Notion widget</strong> and copy the
+          embed link (or download the widget file) again.
         </p>
       </Notice>
     )
@@ -58,7 +58,7 @@ export default function WidgetApp({ config }) {
     return (
       <Notice title="Can’t load your calendar">
         <p className="muted">{error}</p>
-        <p className="muted small">If you turned this widget link off, download a new widget file from Integrations.</p>
+        <p className="muted small">If you turned this widget off, create a new one in Integrations.</p>
       </Notice>
     )
   }

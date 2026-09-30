@@ -66,14 +66,16 @@ with the service-role key.
 
 ## Notion widget
 
-Open **Integrations → Notion widget → Download widget file**. You get `vapor-widget.html`: one self-contained
-file with the whole calendar (grid, agenda, quick-create, sub-blocks, repeats, all-day spines, zoom, categories,
-themes — everything except sharing and integrations). Add it to a Notion page and resize it.
+Open **Integrations → Notion widget → Create widget**. Then either:
 
-The file talks to Supabase directly through the `widget_load` / `widget_write` database functions using a widget
-token, so it needs no server and works wherever Notion hosts it. Anyone who has the file can edit your calendar;
-keep the page private, and turn the widget off in Integrations to revoke it. The template is built by
-`npm run build:widget` (also run automatically by `npm run dev` and `npm run build`).
+- in Notion type `/embed` and paste the copied link (`https://vapor.anthonyy.me/widget.html#t=…`), or
+- use **Download .html** and add `vapor-widget.html` to the page (it just frames that same link).
+
+The widget is the full calendar (grid, agenda, quick-create, sub-blocks, repeats, all-day spines, zoom, categories,
+themes) without sharing or integrations. It lives on your deployed site because Notion's HTML blocks may only
+connect to a few CDNs, never to Supabase. It reads and writes through the `widget_load` / `widget_write` database
+functions with the token in the link. Anyone with the link can edit your calendar: keep the page private, and turn
+the widget off in Integrations to revoke it.
 
 ## Shortcuts
 

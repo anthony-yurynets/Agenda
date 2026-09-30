@@ -1,10 +1,12 @@
-// Standalone widget (vapor-widget.html) for embedding in Notion. It's one
-// self-contained file that talks to Supabase directly with a widget token.
+// The Notion widget page (/widget.html#t=<token>). Notion frames it, either via
+// the downloaded vapor-widget.html wrapper or an /embed block. It reaches your
+// calendar through the widget database functions using the token in the URL.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './lib/theme'
 import WidgetApp from './components/WidgetApp'
+import { supabaseAnonKey, supabaseUrl } from './lib/supabase'
 
 // Sandboxed frames can lack randomUUID; getRandomValues is always there.
 if (!globalThis.crypto.randomUUID) {
@@ -16,6 +18,6 @@ if (!globalThis.crypto.randomUUID) {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <WidgetApp config={window.__VAPOR_WIDGET__} />
+    <WidgetApp config={{ url: supabaseUrl, key: supabaseAnonKey, token: new URLSearchParams(location.hash.slice(1)).get('t') }} />
   </StrictMode>,
 )

@@ -4,9 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-widget.mjs && vite",
-    "build": "node scripts/build-widget.mjs && vite build",
-    "build:widget": "node scripts/build-widget.mjs",
+    "dev": "vite",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

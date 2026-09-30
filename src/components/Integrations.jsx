@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, Copy, Download, KeyRound, LayoutPanelTop, Plus, ShieldCheck, Trash2, Wrench } from 'lucide-react'
-import { buildWidgetFile, downloadBlob, generateToken as shareToken } from '../lib/shareLinks'
-import { supabaseAnonKey, supabaseUrl } from '../lib/supabase'
+import { downloadBlob, generateToken as shareToken, widgetUrl, widgetWrapperFile } from '../lib/shareLinks'
 import LinkList from './LinkList'
 import { supabase } from '../lib/supabase'
 import { format } from '../lib/dates'
@@ -206,7 +205,12 @@ function CopyField({ value, mono, block }) {
   )
 }
 
-/** Links for the Notion widget (/embed). Each works like a private edit link. */
+// Where the widget page lives. Notion can't reach localhost, so links made while
+// developing locally still point at the deployed site.
+const SITE_URL = 'https://vapor.anthonyy.me'
+const widgetBase = () => (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) ? SITE_URL : window.location.origin)
+
+/** Notion widget links. Each works like a private edit link, used by /widget.html. */
 function NotionWidget({ toast }) {
   const [links, setLinks] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -223,14 +227,18 @@ function NotionWidget({ toast }) {
       })
   }, [toast])
 
-  const download = async (link) => {
+  const copyLink = async (link) => {
     try {
-      const blob = await buildWidgetFile(link, { url: supabaseUrl, key: supabaseAnonKey })
-      downloadBlob(blob, 'vapor-widget.html')
-      toast('Widget file downloaded — add it to your Notion page')
-    } catch (err) {
-      toast(err.message, 'error')
+      await navigator.clipboard.writeText(widgetUrl(link, widgetBase()))
+      toast('Embed link copied — paste it into a Notion /embed block')
+    } catch {
+      toast('Couldn’t copy the link', 'error')
     }
+  }
+
+  const download = (link) => {
+    downloadBlob(widgetWrapperFile(widgetUrl(link, widgetBase())), 'vapor-widget.html')
+    toast('vapor-widget.html downloaded — add it to your Notion page')
   }
 
   const create = async () => {
@@ -243,7 +251,7 @@ function NotionWidget({ toast }) {
     setBusy(false)
     if (error) return toast(/kind_check/.test(error.message) ? 'Run supabase/migrations/0006_widget_links.sql first.' : error.message, 'error')
     setLinks((l) => [data, ...(l ?? [])])
-    download(data)
+    copyLink(data)
   }
 
   const revoke = async (id) => {
@@ -253,7 +261,7 @@ function NotionWidget({ toast }) {
     if (error) {
       setLinks(prev)
       toast(error.message, 'error')
-    } else toast('Widget link turned off')
+    } else toast('Widget turned off')
   }
 
   return (
@@ -262,13 +270,13 @@ function NotionWidget({ toast }) {
         <LayoutPanelTop size={17} /> Notion widget
       </h3>
       <p className="muted small">
-        Your full calendar as a single <code>.html</code> file you can add to a Notion page (drag the file in, or use
-        Notion’s HTML block). It opens without signing in, so keep that page private. Turning a widget off here stops
-        its file from working.
+        Your full calendar inside a Notion page. Create a widget, then in Notion type <code>/embed</code> and paste the
+        link, or add the downloaded <code>vapor-widget.html</code> file. It opens without signing in, so keep that page
+        private. Served from <code>{widgetBase()}</code>.
       </p>
       <div className="token-form">
         <button className="btn primary" onClick={create} disabled={busy}>
-          <Download size={16} /> Download widget file
+          <Plus size={16} /> Create widget
         </button>
       </div>
       <LinkList
@@ -276,7 +284,10 @@ function NotionWidget({ toast }) {
         loading={!links}
         onRevoke={revoke}
         empty="No widgets yet."
-        action={{ label: 'Download again', icon: <Download size={14} />, onClick: download }}
+        actions={[
+          { label: 'Copy embed link', icon: <Copy size={14} />, onClick: copyLink },
+          { label: 'Download .html', icon: <Download size={14} />, onClick: download },
+        ]}
       />
     </section>
   )

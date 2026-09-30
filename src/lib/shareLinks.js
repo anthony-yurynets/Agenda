@@ -9,19 +9,32 @@ export function linkUrl(link) {
   return `${window.location.origin}/${link.kind === 'edit' ? 's' : 'b'}/${link.token}`
 }
 
+/** The hosted widget page for a widget link. `base` is your deployed site. */
+export const widgetUrl = (link, base = window.location.origin) => `${base.replace(/\/+$/, '')}/widget.html#t=${link.token}`
+
 /**
- * Build the standalone Notion widget file for a widget link: the prebuilt
- * template with the Supabase URL, anon key and widget token filled in.
+ * vapor-widget.html: a tiny page that frames the hosted widget. (Notion's HTML
+ * blocks can't talk to Supabase directly — their security policy only allows
+ * a few CDNs — so the calendar itself has to live on your site.)
  */
-export async function buildWidgetFile(link, { url, key }) {
-  const res = await fetch('/widget-template.html', { cache: 'no-store' })
-  if (!res.ok) throw new Error('Widget template not found — run `npm run build:widget`.')
-  const template = await res.text()
-  const config = JSON.stringify({ url, key, token: link.token }).replace(/</g, '\\u003c')
-  // Built in pieces so this code (which is bundled into the widget too) never contains the marker itself.
-  const marker = ['null /*', 'VAPOR_WIDGET_CONFIG', '*/'].join('')
-  const html = template.replace(marker, config)
-  if (html === template) throw new Error('Widget template is out of date — run `npm run build:widget`.')
+export function widgetWrapperFile(url) {
+  const safe = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vapor</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; }
+  iframe { display: block; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<iframe src="${safe}" title="Vapor calendar" allow="clipboard-write"></iframe>
+</body>
+</html>
+`
   return new Blob([html], { type: 'text/html' })
 }
 

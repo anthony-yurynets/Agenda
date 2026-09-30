@@ -3,7 +3,7 @@ import { Check, Copy, Link2, Trash2 } from 'lucide-react'
 import { format } from '../lib/dates'
 import { linkUrl } from '../lib/shareLinks'
 
-export default function LinkList({ links, loading, onCopy, onRevoke, empty, action }) {
+export default function LinkList({ links, loading, onCopy, onRevoke, empty, actions }) {
   const [copied, setCopied] = useState(null)
   if (loading) return <p className="muted small">Loading…</p>
   return (
@@ -29,10 +29,12 @@ export default function LinkList({ links, loading, onCopy, onRevoke, empty, acti
               </small>
             </div>
             <div className="link-actions">
-              {action ? (
-                <button className="btn ghost sm" onClick={() => action.onClick(l)}>
-                  {action.icon} {action.label}
-                </button>
+              {actions ? (
+                actions.map((a) => (
+                  <button key={a.label} className="btn ghost sm" onClick={() => a.onClick(l)}>
+                    {a.icon} {a.label}
+                  </button>
+                ))
               ) : (
               <button
                 className="btn ghost sm"

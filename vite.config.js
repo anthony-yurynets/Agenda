@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), vercelApiInDev()],
     // React + supabase-js is ~150 kB gzipped; that's expected, not a problem.
-    build: { chunkSizeWarningLimit: 700 },
+    build: {
+      chunkSizeWarningLimit: 700,
+      // Second page: the Notion widget (framed by Notion, see Integrations → Notion widget).
+      rolldownOptions: { input: { main: 'index.html', widget: 'widget.html' } },
+    },
   }
 })
