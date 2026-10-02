@@ -7,6 +7,7 @@ import {
   CATEGORY_IDS,
   buildIndex,
   categoryLabel,
+  decisionOf,
   isDate,
   prestigeTier,
   searchCompetitions,
@@ -44,6 +45,12 @@ const fieldProps = {
     description: 'What must be submitted, by option name (e.g. ["Research paper", "Demo video"]). Unknown names are added to the user\'s option list. Replaces the current list.',
   },
   timeline: { type: 'array', items: stageSchema, description: 'All stages / important dates. Replaces the current timeline.' },
+  doing: {
+    type: ['string', 'null'],
+    description:
+      '"Are we doing this?" Give a project name (yes — entering with that project; unknown names are added to their project list), ' +
+      '"maybe", "no", or null to clear. Call list_projects first to reuse existing project names.',
+  },
 }
 
 export const COMPETITION_TOOLS = [
@@ -59,6 +66,7 @@ export const COMPETITION_TOOLS = [
         query: { type: 'string' },
         category: { type: 'string', enum: CATEGORY_IDS },
         upcoming_within_days: { type: 'integer', minimum: 0, description: 'Only competitions with a stage in the next N days.' },
+        doing: { type: 'string', enum: ['doing', 'maybe', 'no', 'undecided'], description: 'Only competitions with this answer to "Are we doing this?".' },
       },
     },
     annotations: { readOnlyHint: true },
@@ -97,6 +105,30 @@ export const COMPETITION_TOOLS = [
     annotations: { readOnlyHint: true },
   },
   {
+    name: 'list_projects',
+    title: 'List projects',
+    description: 'The user\'s projects (what they enter competitions with), with the competitions each is entered in.',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'manage_projects',
+    title: 'Manage projects',
+    description: 'Add, rename or delete projects. Deleting a project sets its competitions back to undecided.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        add: { type: 'array', items: { type: 'string' } },
+        rename: {
+          type: 'array',
+          items: { type: 'object', properties: { from: { type: 'string', description: 'Current name or id' }, to: { type: 'string' } }, required: ['from', 'to'] },
+        },
+        remove: { type: 'array', items: { type: 'string' }, description: 'Names or ids.' },
+      },
+    },
+    annotations: { destructiveHint: true },
+  },
+  {
     name: 'manage_submission_options',
     title: 'Manage submission item options',
     description: 'Add, rename or delete submission item options. Deleting an option removes it from every competition.',
@@ -129,18 +161,19 @@ async function todayFor(sb, userId) {
   }
 }
 
-const loadOptions = async (sb, userId) =>
-  unwrap(await sb.from('competition_options').select('*').eq('user_id', userId)).sort((a, b) => a.position - b.position)
+const loadNamed = async (sb, userId, table) => unwrap(await sb.from(table).select('*').eq('user_id', userId)).sort((a, b) => a.position - b.position)
+const loadOptions = (sb, userId) => loadNamed(sb, userId, 'competition_options')
+const loadProjects = (sb, userId) => loadNamed(sb, userId, 'competition_projects')
 
 function findOption(options, ref) {
   const key = String(ref ?? '').trim().toLowerCase()
   return options.find((o) => o.id === ref || o.name.toLowerCase() === key)
 }
 
-/** Resolve option names to ids, creating missing ones. */
-async function resolveItems(sb, userId, names) {
-  must(Array.isArray(names), 'submission_items must be an array of names')
-  const options = await loadOptions(sb, userId)
+/** Resolve names in a user list to ids, creating missing ones. */
+async function resolveNamed(sb, userId, table, names) {
+  must(Array.isArray(names), 'expected an array of names')
+  const options = await loadNamed(sb, userId, table)
   const ids = []
   let position = options.reduce((m, o) => Math.max(m, o.position), -1) + 1
   for (const raw of names) {
@@ -148,12 +181,33 @@ async function resolveItems(sb, userId, names) {
     if (!name) continue
     let o = findOption(options, name)
     if (!o) {
-      o = unwrap(await sb.from('competition_options').insert({ user_id: userId, name, position: position++ }).select('*').single())
+      o = unwrap(await sb.from(table).insert({ user_id: userId, name, position: position++ }).select('*').single())
       options.push(o)
     }
     if (!ids.includes(o.id)) ids.push(o.id)
   }
   return ids
+}
+const resolveItems = (sb, userId, names) => resolveNamed(sb, userId, 'competition_options', names)
+
+/** Add / rename / remove entries in a user list by name or id. */
+async function manageNamed(sb, userId, table, { add = [], rename = [], remove = [] }) {
+  if (add.length) await resolveNamed(sb, userId, table, add)
+  let list = await loadNamed(sb, userId, table)
+  for (const { from, to } of rename) {
+    const o = findOption(list, from)
+    must(o, `No entry named "${from}"`)
+    const name = String(to ?? '').trim().slice(0, 80)
+    must(name, 'rename.to cannot be empty')
+    unwrap(await sb.from(table).update({ name }).eq('user_id', userId).eq('id', o.id))
+  }
+  list = await loadNamed(sb, userId, table)
+  for (const ref of remove) {
+    const o = findOption(list, ref)
+    must(o, `No entry named "${ref}"`)
+    // DB triggers / FKs clean up competitions that used it.
+    unwrap(await sb.from(table).delete().eq('user_id', userId).eq('id', o.id))
+  }
 }
 
 function cleanTimeline(list) {
@@ -182,10 +236,20 @@ async function cleanFields(sb, userId, f) {
   }
   if (f.timeline !== undefined) patch.timeline = cleanTimeline(f.timeline)
   if (f.submission_items !== undefined) patch.submission_items = await resolveItems(sb, userId, f.submission_items)
+  if (f.doing !== undefined) {
+    const v = f.doing === null ? null : String(f.doing).trim()
+    if (!v) Object.assign(patch, { decision: null, project_id: null })
+    else if (/^(maybe|no)$/i.test(v)) Object.assign(patch, { decision: v.toLowerCase(), project_id: null })
+    else {
+      must(!/^(yes|doing)$/i.test(v), 'doing: give the project name to enter with (list_projects), not "yes"')
+      const [id] = await resolveNamed(sb, userId, 'competition_projects', [v])
+      Object.assign(patch, { decision: null, project_id: id })
+    }
+  }
   return patch
 }
 
-function shape(c, optionsById, today) {
+function shape(c, optionsById, projectsById, today) {
   const tl = timelineState(c.timeline, today)
   return {
     id: c.id,
@@ -196,6 +260,8 @@ function shape(c, optionsById, today) {
     prestige: c.prestige,
     prestige_tier: prestigeTier(c.prestige)?.label,
     submission_items: (c.submission_items ?? []).map((id) => optionsById[id]?.name).filter(Boolean),
+    doing: decisionOf(c),
+    project: c.project_id ? projectsById[c.project_id]?.name : undefined,
     timeline: tl.stages.map((s) => ({ label: s.label, date: s.date, end: s.end, day: s.day })),
     status: tl.state,
     next_stage: tl.next ? { label: tl.next.label, date: tl.next.date, days_until: tl.daysToNext } : null,
@@ -210,26 +276,31 @@ async function loadOne(sb, userId, id) {
   return c
 }
 
+const byId = (rows) => Object.fromEntries(rows.map((o) => [o.id, o]))
+
 async function shapeOne(sb, userId, c) {
-  const options = await loadOptions(sb, userId)
-  return shape(c, Object.fromEntries(options.map((o) => [o.id, o])), await todayFor(sb, userId))
+  const [options, projects, today] = await Promise.all([loadOptions(sb, userId), loadProjects(sb, userId), todayFor(sb, userId)])
+  return shape(c, byId(options), byId(projects), today)
 }
 
 // ─── implementations ───────────────────────────────────────────────────────
 
 export const competitionImpl = {
-  async list_competitions(sb, userId, { query = '', category, upcoming_within_days }) {
+  async list_competitions(sb, userId, { query = '', category, upcoming_within_days, doing }) {
     must(category === undefined || CATEGORY_IDS.includes(category), `category must be one of ${CATEGORY_IDS.join(', ')}`)
-    const [comps, options, today] = await Promise.all([
+    const [comps, options, projects, today] = await Promise.all([
       sb.from('competitions').select('*').eq('user_id', userId).then(unwrap),
       loadOptions(sb, userId),
+      loadProjects(sb, userId),
       todayFor(sb, userId),
     ])
-    const byId = Object.fromEntries(options.map((o) => [o.id, o]))
-    let hits = searchCompetitions(buildIndex(comps, byId), query, { today }).map((r) => r.comp)
+    const optionsById = byId(options)
+    const projectsById = byId(projects)
+    let hits = searchCompetitions(buildIndex(comps, optionsById, projectsById), query, { today }).map((r) => r.comp)
     if (!String(query).trim()) hits = sortCompetitions(hits, 'deadline', today)
     if (category) hits = hits.filter((c) => c.category === category)
-    let out = hits.map((c) => shape(c, byId, today))
+    if (doing) hits = hits.filter((c) => decisionOf(c) === doing)
+    let out = hits.map((c) => shape(c, optionsById, projectsById, today))
     if (upcoming_within_days !== undefined) out = out.filter((c) => c.next_stage && c.next_stage.days_until <= upcoming_within_days)
     return { today, count: out.length, categories: CATEGORIES.map((c) => c.id), competitions: out }
   },
@@ -265,23 +336,18 @@ export const competitionImpl = {
     return options.map((o) => ({ id: o.id, name: o.name, used_by: usage[o.id] ?? 0 }))
   },
 
-  async manage_submission_options(sb, userId, { add = [], rename = [], remove = [] }) {
-    if (add.length) await resolveItems(sb, userId, add)
-    let options = await loadOptions(sb, userId)
-    for (const { from, to } of rename) {
-      const o = findOption(options, from)
-      must(o, `No option named "${from}"`)
-      const name = String(to ?? '').trim().slice(0, 80)
-      must(name, 'rename.to cannot be empty')
-      unwrap(await sb.from('competition_options').update({ name }).eq('user_id', userId).eq('id', o.id))
-    }
-    options = await loadOptions(sb, userId)
-    for (const ref of remove) {
-      const o = findOption(options, ref)
-      must(o, `No option named "${ref}"`)
-      // The DB trigger strips it from competitions.
-      unwrap(await sb.from('competition_options').delete().eq('user_id', userId).eq('id', o.id))
-    }
+  async manage_submission_options(sb, userId, args) {
+    await manageNamed(sb, userId, 'competition_options', args)
     return competitionImpl.list_submission_options(sb, userId)
+  },
+
+  async list_projects(sb, userId) {
+    const [projects, comps] = await Promise.all([loadProjects(sb, userId), sb.from('competitions').select('name, project_id').eq('user_id', userId).then(unwrap)])
+    return projects.map((p) => ({ id: p.id, name: p.name, competitions: comps.filter((c) => c.project_id === p.id).map((c) => c.name) }))
+  },
+
+  async manage_projects(sb, userId, args) {
+    await manageNamed(sb, userId, 'competition_projects', args)
+    return competitionImpl.list_projects(sb, userId)
   },
 }

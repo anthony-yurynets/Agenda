@@ -178,9 +178,17 @@ export function DecisionBadge({ comp, projectsById }) {
  */
 export function DecisionPicker({ comp, store, onChange, compact = false }) {
   const [open, setOpen] = useState(false)
+  const [up, setUp] = useState(false)
   const [draft, setDraft] = useState('')
   const ref = useRef(null)
   const d = decisionOf(comp)
+  const toggle = () => {
+    // Open upward when the scroll area has no room below (the table clips overflow).
+    const box = ref.current?.getBoundingClientRect()
+    const area = ref.current?.closest('.comp-table-wrap, .bp-scroll')?.getBoundingClientRect()
+    if (box && area) setUp(area.bottom - box.bottom < 300 && box.top - area.top > area.bottom - box.bottom)
+    setOpen((o) => !o)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -209,7 +217,7 @@ export function DecisionPicker({ comp, store, onChange, compact = false }) {
     <div className={`dropdown decision-picker ${compact ? 'compact' : ''}`} ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
         className={`decision-btn d-${d}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Are we doing ${comp.name || 'this'}? ${d === 'doing' ? `Yes, with ${store.projectsById[comp.project_id]?.name}` : d}`}
@@ -218,7 +226,7 @@ export function DecisionPicker({ comp, store, onChange, compact = false }) {
         <ChevronDown size={13} className="decision-caret" aria-hidden="true" />
       </button>
       {open && (
-        <div className="menu decision-menu" role="menu">
+        <div className={`menu decision-menu ${up ? 'up' : ''}`} role="menu">
           <div className="menu-label">Yes — enter with project</div>
           {store.projects.map((p) => (
             <button key={p.id} role="menuitemradio" aria-checked={comp.project_id === p.id} className="dm-project" onClick={() => pick(p.id)}>

@@ -1076,12 +1076,13 @@ input:disabled { color: var(--muted); }
   text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap;
   background: linear-gradient(var(--glass-solid) 70%, transparent);
 }
-.comp-table th:nth-child(1) { width: 30%; }
-.comp-table th:nth-child(2) { width: 122px; }
-.comp-table th:nth-child(3) { width: 118px; }
-.comp-table th:nth-child(4) { width: 19%; }
-.comp-table th:nth-child(5) { width: 22%; }
-.comp-table th:nth-child(6) { width: 104px; }
+.comp-table th:nth-child(1) { width: 26%; }
+.comp-table th:nth-child(2) { width: 118px; }
+.comp-table th:nth-child(3) { width: 108px; }
+.comp-table th:nth-child(4) { width: 17%; }
+.comp-table th:nth-child(5) { width: 20%; }
+.comp-table th:nth-child(6) { width: 140px; }
+.comp-table th:nth-child(7) { width: 96px; }
 .comp-row { cursor: pointer; }
 .comp-row td {
   padding: 11px 12px; vertical-align: middle; background: var(--glass-strong);
@@ -1228,3 +1229,38 @@ input:disabled { color: var(--muted); }
 .comp-filter .chip.on:hover, .comp-filter .segmented button.on:hover { background: var(--glass-solid); }
 .comp-filter .cat-chip.on:hover { background: color-mix(in srgb, var(--cc) 14%, var(--glass-solid)); }
 .comp-filter .segmented button:not(.on):hover { background: transparent; }
+
+/* "Are we doing this?" */
+:root, :root[data-theme='light'] { --d-doing: #1ba672; --d-maybe: #e29a12; --d-no: #8a93a3; }
+:root[data-theme='dark'] { --d-doing: #34c48b; --d-maybe: #f0aa28; --d-no: #7d8492; }
+.d-doing { --dc: var(--d-doing); } .d-maybe { --dc: var(--d-maybe); } .d-no { --dc: var(--d-no); } .d-undecided { --dc: var(--muted); }
+.decision { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--dc); }
+.decision span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.decision.d-undecided { font-weight: 500; }
+.decision-picker { min-width: 0; }
+.decision-btn {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%; height: 28px; padding: 0 8px 0 9px; border-radius: 8px;
+  background: color-mix(in srgb, var(--dc) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dc) 30%, transparent);
+  transition: background 0.12s;
+}
+.decision-btn.d-undecided { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); border: 0; }
+.decision-btn:hover { background: color-mix(in srgb, var(--dc) 22%, transparent); }
+.decision-caret { color: var(--muted); flex-shrink: 0; }
+.decision-picker:not(.compact) .decision-btn { height: 34px; padding: 0 10px 0 12px; }
+.decision-menu { left: 0; right: auto; width: 240px; }
+.decision-picker.compact .decision-menu { left: auto; right: 0; }
+.decision-menu .dm-project svg:first-child { color: var(--d-doing); }
+.decision-menu .dm-maybe svg:first-child { color: var(--d-maybe); }
+.decision-menu .dm-no svg:first-child { color: var(--d-no); }
+.decision-menu .dm-clear { color: var(--muted); font-size: 13px; }
+.dm-add { display: flex; gap: 4px; align-items: center; padding: 3px 3px 3px 4px; }
+.dm-add input { height: 28px; padding: 0 9px; font-size: 13px; }
+.decision-menu .dm-add .icon-btn.sm { width: 28px; height: 28px; padding: 0; justify-content: center; flex-shrink: 0; }
+.dm-sep { height: 1px; background: var(--hairline-soft); margin: 5px 4px; }
+.dec-chip.on { --cat: var(--dc); }
+.cf-projects { margin-top: 6px; }
+.lists-tabs { display: flex; margin: 4px 0 10px; }
+.items-menu .lists-tabs button { flex: 1; width: auto; height: 26px; padding: 0 10px; justify-content: center; }
+.items-menu .lists-tabs button:not(.on):hover { background: transparent; }
+.items-menu .lists-tabs button.on:hover { background: var(--glass-solid); }
+.decision-menu.up { top: auto; bottom: calc(100% + 6px); }

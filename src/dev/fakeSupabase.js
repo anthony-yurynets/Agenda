@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the parts of supabase-js the app uses.
-const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [] }
+const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [] }
 let clock = 0
 const stamp = () => new Date(Date.UTC(2026, 0, 1) + ++clock).toISOString()
 
@@ -69,6 +69,7 @@ class Query {
         const ex = new Set(tables.workout_exercises.map((e) => e.id))
         tables.workout_sets = tables.workout_sets.filter((x) => ex.has(x.exercise_id))
       }
+      if (this.table === 'competition_projects') for (const c of tables.competitions) if (doomed.has(c.project_id)) c.project_id = null
       if (this.table === 'competition_options') for (const c of tables.competitions) c.submission_items = (c.submission_items ?? []).filter((x) => !doomed.has(x))
       return { data: null, error: null }
     }

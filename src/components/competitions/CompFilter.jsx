@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, SlidersHorizontal } from 'lucide-react'
-import { CATEGORIES, EMPTY_FILTERS, MIN_PRESTIGE, STATES, WITHIN, filterCount } from '../../lib/competitions'
+import { Check, Rocket, SlidersHorizontal } from 'lucide-react'
+import { CATEGORIES, DECISIONS, EMPTY_FILTERS, MIN_PRESTIGE, STATES, WITHIN, filterCount } from '../../lib/competitions'
 
 const toggleIn = (list, id) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
 
@@ -17,7 +17,7 @@ function Single({ label, options, value, onChange }) {
 }
 
 /** Filter dropdown: category, status, next date, prestige and submission items. */
-export default function CompFilter({ value: f, onChange, options, counts }) {
+export default function CompFilter({ value: f, onChange, options, projects, counts }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const set = (patch) => onChange({ ...f, ...patch })
@@ -57,6 +57,36 @@ export default function CompFilter({ value: f, onChange, options, counts }) {
                 )
               })}
             </div>
+          </div>
+
+          <div className="cf-section">
+            <span className="field-label">Are we doing it?</span>
+            <div className="chips">
+              {DECISIONS.map((d) => {
+                const on = f.decisions.includes(d.id)
+                return (
+                  <button key={d.id} className={`chip dec-chip d-${d.id} ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => set({ decisions: toggleIn(f.decisions, d.id) })}>
+                    {on && <Check size={12} />}
+                    {d.label}
+                    <span className="chip-count">{counts.decision[d.id] ?? 0}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {projects.length > 0 && (
+              <div className="chips cf-projects" role="group" aria-label="Doing with project">
+                {projects.map((p) => {
+                  const on = f.projects.includes(p.id)
+                  return (
+                    <button key={p.id} className={`chip opt-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => set({ projects: toggleIn(f.projects, p.id) })}>
+                      {on ? <Check size={12} /> : <Rocket size={12} />}
+                      {p.name}
+                      <span className="chip-count">{counts.project[p.id] ?? 0}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div className="cf-section">
