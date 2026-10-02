@@ -4,13 +4,19 @@ import { useCompetitions } from '../state/useCompetitions'
 import { localToday } from '../state/useFitness'
 import {
   CATEGORIES,
+  EMPTY_FILTERS,
+  MIN_PRESTIGE,
   SORTS,
+  STATES,
+  WITHIN,
   addDays,
   buildIndex,
   countdownLabel,
   daysBetween,
   fmtDate,
+  filterCount,
   hostOf,
+  matchesFilters,
   normalizeUrl,
   parseQuery,
   searchCompetitions,
@@ -20,6 +26,18 @@ import {
 } from '../lib/competitions'
 import { CategoryPill, Countdown, Highlight, OptionManager, PrestigeMeter, TimelineTrack } from '../components/competitions/CompBits'
 import CompetitionPanel from '../components/competitions/CompetitionPanel'
+import CompFilter from '../components/competitions/CompFilter'
+
+// Filters and sort are remembered per browser.
+const PREF_KEY = 'vapor:competitions'
+function readPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}')
+    return { sort: SORTS.some((x) => x.id === p.sort) ? p.sort : 'deadline', filters: { ...EMPTY_FILTERS, ...(p.filters ?? {}) } }
+  } catch {
+    return { sort: 'deadline', filters: EMPTY_FILTERS }
+  }
+}
 
 const MAX_ITEMS = 3
 
@@ -81,8 +99,8 @@ export default function CompetitionsPage({ session, toast }) {
   const today = localToday()
 
   const [query, setQuery] = useState('')
-  const [cats, setCats] = useState(() => new Set())
-  const [sort, setSort] = useState('deadline')
+  const [filters, setFilters] = useState(() => readPrefs().filters)
+  const [sort, setSort] = useState(() => readPrefs().sort)
   const [openId, setOpenId] = useState(null)
   const [itemsOpen, setItemsOpen] = useState(false)
   const searchRef = useRef(null)
@@ -90,19 +108,33 @@ export default function CompetitionsPage({ session, toast }) {
   const itemsRef = useRef(null)
   const deferredQuery = useDeferredValue(query)
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({ sort, filters }))
+    } catch {
+      // Storage blocked: filters just won't persist.
+    }
+  }, [sort, filters])
+  // Drop items that no longer exist (deleted options).
+  const activeFilters = useMemo(() => ({ ...filters, items: filters.items.filter((id) => optionsById[id]) }), [filters, optionsById])
+
   const index = useMemo(() => buildIndex(competitions, optionsById), [competitions, optionsById])
   const timelines = useMemo(() => Object.fromEntries(competitions.map((c) => [c.id, timelineState(c.timeline, today)])), [competitions, today])
   const results = useMemo(() => {
-    const hits = searchCompetitions(index, deferredQuery, { today }).filter((r) => !cats.size || cats.has(r.comp.category))
+    const hits = searchCompetitions(index, deferredQuery, { today }).filter((r) => matchesFilters(r.comp, activeFilters, timelines[r.comp.id]))
     // A text query ranks by relevance; otherwise use the chosen sort.
     return parseQuery(deferredQuery).terms.length ? hits : sortCompetitions(hits, sort, today, (r) => r.comp)
-  }, [index, deferredQuery, cats, sort, today])
+  }, [index, deferredQuery, activeFilters, timelines, sort, today])
 
   const counts = useMemo(() => {
-    const out = {}
-    for (const c of competitions) out[c.category] = (out[c.category] ?? 0) + 1
+    const out = { category: {}, state: {} }
+    for (const c of competitions) {
+      out.category[c.category] = (out.category[c.category] ?? 0) + 1
+      const st = timelines[c.id].state
+      out.state[st] = (out.state[st] ?? 0) + 1
+    }
     return out
-  }, [competitions])
+  }, [competitions, timelines])
   const usage = useMemo(() => {
     const u = {}
     for (const c of competitions) for (const id of c.submission_items ?? []) u[id] = (u[id] ?? 0) + 1
@@ -120,7 +152,22 @@ export default function CompetitionsPage({ session, toast }) {
   )
 
   const open = openId ? competitions.find((c) => c.id === openId) : null
-  const filtered = query.trim() || cats.size
+  const nFilters = filterCount(activeFilters)
+  const filtered = Boolean(query.trim() || nFilters)
+  const setF = (patch) => setFilters((f) => ({ ...f, ...patch }))
+  const optionName = (id) => optionsById[id]?.name
+
+  // Removable chips for each active non-category filter.
+  const activeChips = [
+    ...activeFilters.states.map((id) => ({ key: `s-${id}`, label: STATES.find((x) => x.id === id).label, clear: () => setF({ states: filters.states.filter((x) => x !== id) }) })),
+    activeFilters.within !== null && { key: 'within', label: `Next date ≤ ${WITHIN.find((x) => x.id === activeFilters.within)?.label ?? `${activeFilters.within} days`}`, clear: () => setF({ within: null }) },
+    activeFilters.minPrestige !== null && { key: 'prestige', label: `Prestige ${MIN_PRESTIGE.find((x) => x.id === activeFilters.minPrestige)?.label ?? `${activeFilters.minPrestige}+`}`, clear: () => setF({ minPrestige: null }) },
+    ...activeFilters.items.map((id, i) => ({
+      key: `i-${id}`,
+      label: `${i > 0 ? (activeFilters.itemMode === 'all' ? '& ' : 'or ') : 'Needs '}${optionName(id)}`,
+      clear: () => setF({ items: filters.items.filter((x) => x !== id) }),
+    })),
+  ].filter(Boolean)
 
   // "/" focuses search; Escape closes the panel.
   useEffect(() => {
@@ -152,13 +199,9 @@ export default function CompetitionsPage({ session, toast }) {
     else btns[Math.min(i, btns.length - 1)]?.focus()
   }
 
-  const toggleCat = (id) =>
-    setCats((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  const add = () => setOpenId(store.createCompetition({ category: cats.size === 1 ? [...cats][0] : 'other' }))
+  const toggleCat = (id) => setF({ categories: filters.categories.includes(id) ? filters.categories.filter((x) => x !== id) : [...filters.categories, id] })
+  const clearAll = () => (setQuery(''), setFilters(EMPTY_FILTERS))
+  const add = () => setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other' }))
 
   return (
     <div className="comps">
@@ -217,20 +260,19 @@ export default function CompetitionsPage({ session, toast }) {
 
         <div className="comps-filters">
           <div className="chips" role="group" aria-label="Filter by category">
-            {CATEGORIES.map((c) => (
-              <button key={c.id} className={`chip cat-chip cc-${c.id} ${cats.has(c.id) ? 'on' : ''}`} aria-pressed={cats.has(c.id)} onClick={() => toggleCat(c.id)}>
-                <i aria-hidden="true" />
-                {c.label}
-                <span className="chip-count">{counts[c.id] ?? 0}</span>
-              </button>
-            ))}
-            {filtered ? (
-              <button className="chip" onClick={() => (setQuery(''), setCats(new Set()))}>
-                <X size={12} /> Clear
-              </button>
-            ) : null}
+            {CATEGORIES.map((c) => {
+              const on = filters.categories.includes(c.id)
+              return (
+                <button key={c.id} className={`chip cat-chip cc-${c.id} ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggleCat(c.id)}>
+                  <i aria-hidden="true" />
+                  {c.label}
+                  <span className="chip-count">{counts.category[c.id] ?? 0}</span>
+                </button>
+              )
+            })}
           </div>
           <span className="flex1" />
+          <CompFilter value={activeFilters} onChange={setFilters} options={store.options} counts={counts} />
           <div className="segmented small" role="radiogroup" aria-label="Sort by">
             {SORTS.map((s) => (
               <button key={s.id} role="radio" aria-checked={sort === s.id} className={sort === s.id ? 'on' : ''} onClick={() => setSort(s.id)}>
@@ -239,6 +281,22 @@ export default function CompetitionsPage({ session, toast }) {
             ))}
           </div>
         </div>
+
+        {(activeChips.length > 0 || filtered) && (
+          <div className="active-filters" aria-label="Active filters">
+            {activeChips.map((c) => (
+              <button key={c.key} className="af-chip" onClick={c.clear} aria-label={`Remove filter: ${c.label}`}>
+                {c.label} <X size={12} />
+              </button>
+            ))}
+            <span className="af-count muted small">
+              {results.length} of {competitions.length}
+            </span>
+            <button className="btn ghost sm" onClick={clearAll}>
+              Clear all
+            </button>
+          </div>
+        )}
 
         {upNext.length > 0 && !filtered && (
           <section className="up-next" aria-label="Upcoming dates">
@@ -291,8 +349,13 @@ export default function CompetitionsPage({ session, toast }) {
             <div className="comp-empty">
               {competitions.length ? (
                 <>
-                  <p>No competitions match “{query}”.</p>
-                  <p className="muted small">Try fewer words, or clear the category filter.</p>
+                  <p>{query.trim() ? `No competitions match “${query.trim()}”${nFilters ? ' with these filters' : ''}.` : 'No competitions match these filters.'}</p>
+                  <p className="muted small">
+                    {query.trim() ? 'Try fewer words, or ' : ''}
+                    <button className="link-btn" onClick={clearAll}>
+                      clear {query.trim() && nFilters ? 'search and filters' : query.trim() ? 'the search' : 'all filters'}
+                    </button>
+                  </p>
                 </>
               ) : (
                 <>

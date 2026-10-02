@@ -289,3 +289,41 @@ export function sortCompetitions(list, sort, today, get = (x) => x) {
   }[sort]
   return [...list].sort((x, y) => by(get(x), get(y)))
 }
+
+// ─── Filters ────────────────────────────────────────────────────────────────
+
+export const STATES = [
+  { id: 'upcoming', label: 'Not started' },
+  { id: 'active', label: 'In progress' },
+  { id: 'finished', label: 'Finished' },
+  { id: 'none', label: 'No dates' },
+]
+export const WITHIN = [
+  { id: null, label: 'Any time' },
+  { id: 7, label: '7 days' },
+  { id: 30, label: '30 days' },
+  { id: 90, label: '90 days' },
+]
+export const MIN_PRESTIGE = [
+  { id: null, label: 'Any' },
+  { id: 4, label: '4+' },
+  { id: 7, label: '7+' },
+  { id: 9, label: '9+' },
+]
+export const EMPTY_FILTERS = { categories: [], states: [], within: null, minPrestige: null, items: [], itemMode: 'any' }
+
+/** Number of active filter groups (for the badge). */
+export const filterCount = (f) =>
+  (f.categories.length > 0) + (f.states.length > 0) + (f.within !== null) + (f.minPrestige !== null) + (f.items.length > 0)
+
+export function matchesFilters(c, f, tl) {
+  if (f.categories.length && !f.categories.includes(c.category)) return false
+  if (f.states.length && !f.states.includes(tl.state)) return false
+  if (f.within !== null && (tl.daysToNext === null || tl.daysToNext > f.within)) return false
+  if (f.minPrestige !== null && !(c.prestige >= f.minPrestige)) return false
+  if (f.items.length) {
+    const have = c.submission_items ?? []
+    if (f.itemMode === 'all' ? !f.items.every((id) => have.includes(id)) : !f.items.some((id) => have.includes(id))) return false
+  }
+  return true
+}

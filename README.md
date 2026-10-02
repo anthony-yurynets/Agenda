@@ -77,7 +77,9 @@ a "today" marker and a countdown to the next date. An "up next" strip shows ever
 Search is instant and typo-tolerant: it matches whole words, prefixes, initials (`isef`), one-letter typos
 (`enginering`) and scattered letters in the name, across name, description, items, stage names and link. Filters
 mix in: `#research` / `cat:soft`, `>7` / `p>=8` / `p:9` (prestige), `soon` (a stage within 14 days). Press `/` to
-search, ↑/↓ to move through rows, Enter to open. The logic lives in [`src/lib/competitions.js`](src/lib/competitions.js).
+search, ↑/↓ to move through rows, Enter to open. **Filter** narrows by category, status (not started / in progress / finished / no
+dates), next date within 7/30/90 days, minimum prestige, and submission items (needs any or all); active filters show
+as removable chips and are remembered per browser. The logic lives in [`src/lib/competitions.js`](src/lib/competitions.js).
 
 Submission items come from your own option list (**Items** in the header, or *Edit list* in a competition):
 add, rename or delete options; deleting one removes it from every competition. Timeline stages take a date or a
