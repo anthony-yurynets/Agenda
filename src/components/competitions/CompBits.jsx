@@ -178,7 +178,7 @@ export function DecisionBadge({ comp, projectsById }) {
  */
 export function DecisionPicker({ comp, store, onChange, compact = false }) {
   const [open, setOpen] = useState(false)
-  const [up, setUp] = useState(false)
+  const [place, setPlace] = useState({ up: false, room: null })
   const [draft, setDraft] = useState('')
   const ref = useRef(null)
   const d = decisionOf(comp)
@@ -186,7 +186,12 @@ export function DecisionPicker({ comp, store, onChange, compact = false }) {
     // Open upward when the scroll area has no room below (the table clips overflow).
     const box = ref.current?.getBoundingClientRect()
     const area = ref.current?.closest('.comp-table-wrap, .bp-scroll')?.getBoundingClientRect()
-    if (box && area) setUp(area.bottom - box.bottom < 300 && box.top - area.top > area.bottom - box.bottom)
+    if (box && area) {
+      const below = area.bottom - box.bottom
+      const above = box.top - area.top
+      const up = below < 300 && above > below
+      setPlace({ up, room: Math.max((up ? above : below) - 12, 160) })
+    }
     setOpen((o) => !o)
   }
 
@@ -226,7 +231,7 @@ export function DecisionPicker({ comp, store, onChange, compact = false }) {
         <ChevronDown size={13} className="decision-caret" aria-hidden="true" />
       </button>
       {open && (
-        <div className={`menu decision-menu ${up ? 'up' : ''}`} role="menu">
+        <div className={`menu decision-menu ${place.up ? 'up' : ''}`} role="menu" style={{ maxHeight: place.room ?? undefined }}>
           <div className="menu-label">Yes — enter with project</div>
           {store.projects.map((p) => (
             <button key={p.id} role="menuitemradio" aria-checked={comp.project_id === p.id} className="dm-project" onClick={() => pick(p.id)}>
