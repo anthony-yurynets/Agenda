@@ -14,6 +14,7 @@ import CalendarPage from '../pages/CalendarPage'
 import TestingPage from '../pages/TestingPage'
 // Heavy (body-map SVGs): loaded when the tab is first opened.
 const FitnessPage = lazy(() => import('../pages/FitnessPage'))
+const CompetitionsPage = lazy(() => import('../pages/CompetitionsPage'))
 
 // Settings screens reached from the sidebar (not tabs).
 const SETTINGS_PAGES = ['sharing', 'integrations']
@@ -146,6 +147,13 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
     content = (
       <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
         <FitnessPage session={session} toast={toast} />
+      </Suspense>
+    )
+  }
+  else if (page === 'competitions') {
+    content = (
+      <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
+        <CompetitionsPage session={session} toast={toast} />
       </Suspense>
     )
   }

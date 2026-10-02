@@ -3,7 +3,7 @@
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
 
-- **Pages:** tabs across the top (Calendar, Fitness, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+- **Pages:** tabs across the top (Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
   in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0009_fitness.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0010_competitions.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -67,6 +67,26 @@ slower for big muscles (see [`src/lib/fitness.js`](src/lib/fitness.js)).
 Your AI can plan and log workouts over MCP: `get_fitness_summary` (start here), `list_workouts`, `get_workout`,
 `create_workout`, `update_workout`, `add_exercise`, `update_exercise`, `log_sets`, `delete_workout`,
 `delete_exercise`. Try: *"Look at my recovery and plan my workouts for next week, weekdays only."*
+
+## Competitions
+
+A frosted table of competitions you're tracking: name, link and description, category (Research, Software,
+Innovation, Engineering, Other), prestige out of 10, submission items, and a timeline of stages drawn as a track with
+a "today" marker and a countdown to the next date. An "up next" strip shows every stage in the next 45 days.
+
+Search is instant and typo-tolerant: it matches whole words, prefixes, initials (`isef`), one-letter typos
+(`enginering`) and scattered letters in the name, across name, description, items, stage names and link. Filters
+mix in: `#research` / `cat:soft`, `>7` / `p>=8` / `p:9` (prestige), `soon` (a stage within 14 days). Press `/` to
+search, ↑/↓ to move through rows, Enter to open. The logic lives in [`src/lib/competitions.js`](src/lib/competitions.js).
+
+Submission items come from your own option list (**Items** in the header, or *Edit list* in a competition):
+add, rename or delete options; deleting one removes it from every competition. Timeline stages take a date or a
+"Day N" (Day 1 = the first stage) and an optional end date.
+
+Your AI can manage it over MCP: `list_competitions` (with the same search), `get_competition`,
+`create_competition`, `update_competition`, `delete_competition`, `list_submission_options`,
+`manage_submission_options`. Try: *"Find 5 prestigious research competitions for high schoolers and add them with
+their deadlines."*
 
 ## Sharing
 

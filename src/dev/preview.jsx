@@ -81,6 +81,25 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   T.workouts.push({ id: ai, user_id: 'u1', title: 'Upper hypertrophy', date: day(1), status: 'planned', notes: 'Planned by your AI', source: 'ai', completed_at: null, created_at: new Date().toISOString() })
   T.workout_exercises.push({ id: crypto.randomUUID(), user_id: 'u1', workout_id: ai, name: 'Incline dumbbell press', muscles: ['chest', 'deltoids'], position: 0, notes: '' })
 }
+// Competition sample data.
+{
+  const T = fakeSupabase.tables
+  const day = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
+  const opt = (name, i) => ({ id: crypto.randomUUID(), user_id: 'u1', name, position: i, created_at: new Date().toISOString() })
+  const O = ['Research paper', 'Demo video', 'Source code', 'Slide deck', 'Poster', 'Abstract', 'Prototype', 'Essay'].map(opt)
+  T.competition_options.push(...O)
+  const by = (...names) => names.map((n) => O.find((o) => o.name === n).id)
+  const comp = (o) => ({ id: crypto.randomUUID(), user_id: 'u1', url: '', description: '', prestige: null, category: 'other', submission_items: [], timeline: [], source: 'user', created_at: new Date(Date.now() - Math.random() * 1e10).toISOString(), ...o })
+  T.competitions.push(
+    comp({ name: 'Regeneron International Science and Engineering Fair', url: 'https://www.societyforscience.org/isef/', category: 'research', prestige: 10, description: 'The world’s largest pre-college STEM competition. Qualify through an affiliated regional fair.', submission_items: by('Research paper', 'Poster', 'Abstract'), timeline: [{ label: 'Regional fair', date: day(-20) }, { label: 'State fair', date: day(12) }, { label: 'ISEF finals', date: day(60), end: day(65) }] }),
+    comp({ name: 'Congressional App Challenge', url: 'congressionalappchallenge.us', category: 'software', prestige: 7, description: 'Build an app; judged by your district’s member of Congress.', submission_items: by('Demo video', 'Source code'), timeline: [{ label: 'Registration', date: day(-30) }, { label: 'Submission deadline', date: day(3) }, { label: 'Winners announced', date: day(45) }] }),
+    comp({ name: 'MIT THINK Scholars', url: 'https://think.mit.edu', category: 'research', prestige: 8, description: 'Research proposal competition with funding and mentorship from MIT students.', submission_items: by('Research paper', 'Essay'), timeline: [{ label: 'Proposal due', date: day(90) }, { label: 'Finalists', date: day(120) }] }),
+    comp({ name: 'Conrad Challenge', url: 'conradchallenge.org', category: 'innovation', prestige: 6, description: 'Team innovation challenge: aerospace, energy, health, and more.', submission_items: by('Slide deck', 'Prototype', 'Demo video'), source: 'ai', timeline: [{ label: 'Stage 1 · Idea', date: day(-1) }, { label: 'Stage 2 · Business plan', date: day(9) }, { label: 'Stage 3 · Pitch', date: day(29) }] }),
+    comp({ name: 'FIRST Robotics Competition', url: 'firstinspires.org', category: 'engineering', prestige: 7, submission_items: by('Prototype'), timeline: [{ label: 'Kickoff', date: day(95) }, { label: 'Regionals', date: day(150) }, { label: 'Championship', date: day(200) }] }),
+    comp({ name: 'Google Code-in Hackathon', category: 'software', prestige: 4, submission_items: by('Source code', 'Demo video'), timeline: [{ label: 'Hacking', date: day(-60), end: day(-58) }, { label: 'Judging', date: day(-50) }] }),
+    comp({ name: 'Local essay contest', category: 'other', prestige: 2, submission_items: by('Essay') }),
+  )
+}
 globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase
 globalThis.__VAPOR_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase

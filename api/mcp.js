@@ -16,7 +16,10 @@ const INSTRUCTIONS =
   'Any block can be divided into sub-blocks, which must fall on the same date and inside the ' +
   "parent's time range. Call list_categories before creating blocks if you don't know the categories. " +
   'Fitness: call get_fitness_summary first (recovery per muscle, weekly goal, weekday-only schedule), then ' +
-  'create_workout to plan sessions; the user logs sets in the app, or you can with log_sets.'
+  'create_workout to plan sessions; the user logs sets in the app, or you can with log_sets. ' +
+  'Competitions: a tracker of contests the user may enter (name, link, description, prestige 1–10, category, ' +
+  'submission items from their own option list, and a timeline of dated stages). Call list_submission_options ' +
+  'before create_competition to reuse their item names; use list_competitions with a query to find one.'
 
 async function authenticate(req) {
   const token = bearer(req)
