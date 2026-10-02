@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Bot, ExternalLink, Plus, Trash2, X } from 'lucide-react'
 import { CATEGORIES, addDays, daysBetween, fmtDate, isDate, normalizeUrl, prestigeTier, stages as sortStages } from '../../lib/competitions'
-import { OptionManager } from './CompBits'
+import { DecisionPicker, OptionManager } from './CompBits'
 
 /** Timeline editor: one row per stage, as a vertical rail. Date and "Day N" stay in sync. */
 function TimelineEditor({ timeline, today, onChange }) {
@@ -126,6 +126,9 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
           onChange={(e) => update({ name: e.target.value }, { debounce: 400 })}
         />
 
+        <span className="field-label">Are we doing this?</span>
+        <DecisionPicker comp={c} store={store} onChange={(answer) => store.setDecision(c.id, answer)} />
+
         <label className="field">
           <span className="field-label">Link</span>
           <div className="link-field">
@@ -185,7 +188,7 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
         </div>
 
         <span className="field-label">Submission items</span>
-        <OptionManager store={store} selected={c.submission_items ?? []} onToggle={toggleItem} usage={usage} />
+        <OptionManager list={store.optionList} selected={c.submission_items ?? []} onToggle={toggleItem} usage={usage} />
 
         <span className="field-label">Timeline</span>
         <TimelineEditor timeline={c.timeline} today={today} onChange={(timeline, opts) => update({ timeline }, opts)} />

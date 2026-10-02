@@ -14,6 +14,7 @@ import {
   countdownLabel,
   daysBetween,
   fmtDate,
+  decisionOf,
   filterCount,
   hostOf,
   matchesFilters,
@@ -24,7 +25,7 @@ import {
   timelineState,
   urgency,
 } from '../lib/competitions'
-import { CategoryPill, Countdown, Highlight, OptionManager, PrestigeMeter, TimelineTrack } from '../components/competitions/CompBits'
+import { CategoryPill, Countdown, DecisionPicker, Highlight, OptionManager, PrestigeMeter, TimelineTrack } from '../components/competitions/CompBits'
 import CompetitionPanel from '../components/competitions/CompetitionPanel'
 import CompFilter from '../components/competitions/CompFilter'
 
@@ -41,12 +42,12 @@ function readPrefs() {
 
 const MAX_ITEMS = 3
 
-function Row({ r, tl, today, optionsById, selected, onOpen, onKeyNav }) {
+function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
   const c = r.comp
-  const items = (c.submission_items ?? []).map((id) => optionsById[id]).filter(Boolean)
+  const items = (c.submission_items ?? []).map((id) => store.optionsById[id]).filter(Boolean)
   const href = normalizeUrl(c.url)
   return (
-    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' ? 'finished' : ''}`} onClick={() => onOpen(c.id)}>
+    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' || c.decision === 'no' ? 'finished' : ''}`} onClick={() => onOpen(c.id)}>
       <td className="c-name">
         <span className="cat-edge" aria-hidden="true" />
         <button className="comp-open" onClick={(e) => (e.stopPropagation(), onOpen(c.id))} onKeyDown={onKeyNav} data-comp-row>
@@ -85,6 +86,9 @@ function Row({ r, tl, today, optionsById, selected, onOpen, onKeyNav }) {
       <td className="c-timeline" data-label="Timeline">
         <TimelineTrack tl={tl} today={today} />
       </td>
+      <td className="c-doing" data-label="Doing?">
+        <DecisionPicker comp={c} store={store} onChange={(answer) => store.setDecision(c.id, answer)} compact />
+      </td>
       <td className="c-next" data-label="Next">
         <Countdown days={tl.daysToNext} date={tl.next?.date} />
       </td>
@@ -95,7 +99,7 @@ function Row({ r, tl, today, optionsById, selected, onOpen, onKeyNav }) {
 /** Competition tracker: instant search over a frosted table, editing in a side panel. */
 export default function CompetitionsPage({ session, toast }) {
   const store = useCompetitions(session.user.id, { onError: (m) => toast(m, 'error') })
-  const { competitions, optionsById } = store
+  const { competitions, optionsById, projectsById } = store
   const today = localToday()
 
   const [query, setQuery] = useState('')
@@ -103,6 +107,7 @@ export default function CompetitionsPage({ session, toast }) {
   const [sort, setSort] = useState(() => readPrefs().sort)
   const [openId, setOpenId] = useState(null)
   const [itemsOpen, setItemsOpen] = useState(false)
+  const [listTab, setListTab] = useState('items')
   const searchRef = useRef(null)
   const tableRef = useRef(null)
   const itemsRef = useRef(null)
@@ -116,9 +121,12 @@ export default function CompetitionsPage({ session, toast }) {
     }
   }, [sort, filters])
   // Drop items that no longer exist (deleted options).
-  const activeFilters = useMemo(() => ({ ...filters, items: filters.items.filter((id) => optionsById[id]) }), [filters, optionsById])
+  const activeFilters = useMemo(
+    () => ({ ...filters, items: filters.items.filter((id) => optionsById[id]), projects: filters.projects.filter((id) => projectsById[id]) }),
+    [filters, optionsById, projectsById],
+  )
 
-  const index = useMemo(() => buildIndex(competitions, optionsById), [competitions, optionsById])
+  const index = useMemo(() => buildIndex(competitions, optionsById, projectsById), [competitions, optionsById, projectsById])
   const timelines = useMemo(() => Object.fromEntries(competitions.map((c) => [c.id, timelineState(c.timeline, today)])), [competitions, today])
   const results = useMemo(() => {
     const hits = searchCompetitions(index, deferredQuery, { today }).filter((r) => matchesFilters(r.comp, activeFilters, timelines[r.comp.id]))
@@ -127,8 +135,11 @@ export default function CompetitionsPage({ session, toast }) {
   }, [index, deferredQuery, activeFilters, timelines, sort, today])
 
   const counts = useMemo(() => {
-    const out = { category: {}, state: {} }
+    const out = { category: {}, state: {}, decision: {}, project: {} }
     for (const c of competitions) {
+      const d = decisionOf(c)
+      out.decision[d] = (out.decision[d] ?? 0) + 1
+      if (c.project_id) out.project[c.project_id] = (out.project[c.project_id] ?? 0) + 1
       out.category[c.category] = (out.category[c.category] ?? 0) + 1
       const st = timelines[c.id].state
       out.state[st] = (out.state[st] ?? 0) + 1
@@ -156,9 +167,12 @@ export default function CompetitionsPage({ session, toast }) {
   const filtered = Boolean(query.trim() || nFilters)
   const setF = (patch) => setFilters((f) => ({ ...f, ...patch }))
   const optionName = (id) => optionsById[id]?.name
+  const decisionChipLabel = { doing: 'Doing', maybe: 'Maybe', no: 'Not doing', undecided: 'Undecided' }
 
   // Removable chips for each active non-category filter.
   const activeChips = [
+    ...activeFilters.decisions.map((id) => ({ key: `d-${id}`, label: decisionChipLabel[id], clear: () => setF({ decisions: filters.decisions.filter((x) => x !== id) }) })),
+    ...activeFilters.projects.map((id) => ({ key: `p-${id}`, label: `Project: ${projectsById[id].name}`, clear: () => setF({ projects: filters.projects.filter((x) => x !== id) }) })),
     ...activeFilters.states.map((id) => ({ key: `s-${id}`, label: STATES.find((x) => x.id === id).label, clear: () => setF({ states: filters.states.filter((x) => x !== id) }) })),
     activeFilters.within !== null && { key: 'within', label: `Next date ≤ ${WITHIN.find((x) => x.id === activeFilters.within)?.label ?? `${activeFilters.within} days`}`, clear: () => setF({ within: null }) },
     activeFilters.minPrestige !== null && { key: 'prestige', label: `Prestige ${MIN_PRESTIGE.find((x) => x.id === activeFilters.minPrestige)?.label ?? `${activeFilters.minPrestige}+`}`, clear: () => setF({ minPrestige: null }) },
@@ -243,12 +257,25 @@ export default function CompetitionsPage({ session, toast }) {
           <div className="comps-actions">
             <div className="dropdown" ref={itemsRef}>
               <button className={`btn ghost ${itemsOpen ? 'is-active' : ''}`} onClick={() => setItemsOpen((o) => !o)} aria-expanded={itemsOpen}>
-                <ListChecks size={15} /> Items
+                <ListChecks size={15} /> Lists
               </button>
               {itemsOpen && (
                 <div className="menu items-menu">
-                  <div className="menu-label">Submission item options</div>
-                  <OptionManager store={store} usage={usage} startEditing />
+                  <div className="segmented small lists-tabs" role="tablist" aria-label="Lists">
+                    {[
+                      ['items', 'Submission items'],
+                      ['projects', 'Projects'],
+                    ].map(([id, label]) => (
+                      <button key={id} role="tab" aria-selected={listTab === id} className={listTab === id ? 'on' : ''} onClick={() => setListTab(id)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {listTab === 'items' ? (
+                    <OptionManager key="items" list={store.optionList} usage={usage} startEditing />
+                  ) : (
+                    <OptionManager key="projects" list={store.projectList} usage={counts.project} startEditing placeholder="New project (e.g. Solar drone)" noun="projects" />
+                  )}
                 </div>
               )}
             </div>
@@ -272,7 +299,7 @@ export default function CompetitionsPage({ session, toast }) {
             })}
           </div>
           <span className="flex1" />
-          <CompFilter value={activeFilters} onChange={setFilters} options={store.options} counts={counts} />
+          <CompFilter value={activeFilters} onChange={setFilters} options={store.options} projects={store.projects} counts={counts} />
           <div className="segmented small" role="radiogroup" aria-label="Sort by">
             {SORTS.map((s) => (
               <button key={s.id} role="radio" aria-checked={sort === s.id} className={sort === s.id ? 'on' : ''} onClick={() => setSort(s.id)}>
@@ -327,6 +354,7 @@ export default function CompetitionsPage({ session, toast }) {
                 <th scope="col">Prestige</th>
                 <th scope="col">Submission items</th>
                 <th scope="col">Timeline</th>
+                <th scope="col">Doing?</th>
                 <th scope="col">Next date</th>
               </tr>
             </thead>
@@ -337,7 +365,7 @@ export default function CompetitionsPage({ session, toast }) {
                   r={r}
                   tl={timelines[r.comp.id]}
                   today={today}
-                  optionsById={optionsById}
+                  store={store}
                   selected={r.comp.id === openId}
                   onOpen={setOpenId}
                   onKeyNav={onKeyNav}
