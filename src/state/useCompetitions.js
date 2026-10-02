@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql in the Supabase SQL editor to enable Competitions.'
-const TABLE = { comps: 'competitions', options: 'competition_options' }
+const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql and 0011_competition_projects.sql in the Supabase SQL editor to enable Competitions.'
+const TABLE = { comps: 'competitions', options: 'competition_options', projects: 'competition_projects' }
 
 /**
  * Competitions and submission-item options for the signed-in owner. Writes
  * are optimistic and go through a serial queue; realtime keeps AI edits live.
  */
 export function useCompetitions(userId, { onError } = {}) {
-  const [data, setData] = useState({ comps: {}, options: {} })
+  const [data, setData] = useState({ comps: {}, options: {}, projects: {} })
   const [loading, setLoading] = useState(true)
   const ref = useRef(data)
   const errorRef = useRef(onError)
@@ -35,7 +35,7 @@ export function useCompetitions(userId, { onError } = {}) {
   }
   const report = (err) => {
     const m = err?.message ?? ''
-    errorRef.current?.(/competition/.test(m) && /relation|schema|exist/.test(m) ? MIGRATION_HINT : m || 'Something went wrong')
+    errorRef.current?.(/competition|project_id|decision/.test(m) && /relation|schema|exist/.test(m) ? MIGRATION_HINT : m || 'Something went wrong')
   }
 
   const enqueue = useCallback((ids, fn, rollback) => {
@@ -56,14 +56,13 @@ export function useCompetitions(userId, { onError } = {}) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [c, o] = await Promise.all([supabase.from('competitions').select('*'), supabase.from('competition_options').select('*')])
+      const [c, o, p] = await Promise.all(Object.values(TABLE).map((t) => supabase.from(t).select('*')))
       if (cancelled) return
       setLoading(false)
-      if (c.error || o.error) return report(c.error ?? o.error)
-      commit(() => ({
-        comps: Object.fromEntries(c.data.map((r) => [r.id, r])),
-        options: Object.fromEntries(o.data.map((r) => [r.id, r])),
-      }))
+      const error = c.error ?? o.error ?? p.error
+      if (error) return report(error)
+      const byId = (rows) => Object.fromEntries(rows.map((r) => [r.id, r]))
+      commit(() => ({ comps: byId(c.data), options: byId(o.data), projects: byId(p.data) }))
     })()
     return () => {
       cancelled = true
@@ -157,6 +156,10 @@ export function useCompetitions(userId, { onError } = {}) {
             Object.entries(prev.comps).map(([cid, c]) => [cid, c.submission_items?.includes(id) ? { ...c, submission_items: c.submission_items.filter((x) => x !== id) } : c]),
           )
         }
+        // …and deleting a project sends its competitions back to undecided.
+        if (key === 'projects') {
+          next.comps = Object.fromEntries(Object.entries(prev.comps).map(([cid, c]) => [cid, c.project_id === id ? { ...c, project_id: null } : c]))
+        }
         return next
       })
       enqueue([id], () => supabase.from(TABLE[key]).delete().eq('id', id), () => commit(() => snapshot))
@@ -183,20 +186,30 @@ export function useCompetitions(userId, { onError } = {}) {
     [insert],
   )
 
-  const createOption = useCallback(
-    (name) => {
+  /** Add a named entry to a user list (options or projects); reuses an existing one with the same name. */
+  const createNamed = useCallback(
+    (key, name) => {
       const clean = name.trim().slice(0, 80)
       if (!clean) return null
-      const existing = Object.values(ref.current.options).find((o) => o.name.toLowerCase() === clean.toLowerCase())
+      const existing = Object.values(ref.current[key]).find((o) => o.name.toLowerCase() === clean.toLowerCase())
       if (existing) return existing.id
-      const position = Object.values(ref.current.options).reduce((m, o) => Math.max(m, o.position), -1) + 1
-      return insert('options', { id: crypto.randomUUID(), name: clean, position, created_at: new Date().toISOString() })
+      const position = Object.values(ref.current[key]).reduce((m, o) => Math.max(m, o.position), -1) + 1
+      return insert(key, { id: crypto.randomUUID(), name: clean, position, created_at: new Date().toISOString() })
     },
     [insert],
   )
 
+  /** "Are we doing this?": a project id (doing), 'maybe', 'no', or null (undecided). */
+  const setDecision = useCallback(
+    (id, answer) =>
+      update('comps', id, answer === 'maybe' || answer === 'no' ? { decision: answer, project_id: null } : { decision: null, project_id: answer ?? null }),
+    [update],
+  )
+
   const competitions = useMemo(() => Object.values(data.comps), [data.comps])
-  const options = useMemo(() => Object.values(data.options).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)), [data.options])
+  const sorted = (map) => Object.values(map).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+  const options = useMemo(() => sorted(data.options), [data.options])
+  const projects = useMemo(() => sorted(data.projects), [data.projects])
 
   return {
     loading,
@@ -206,8 +219,21 @@ export function useCompetitions(userId, { onError } = {}) {
     createCompetition,
     updateCompetition: (id, patch, opts) => update('comps', id, patch, opts),
     deleteCompetition: (id) => remove('comps', id),
-    createOption,
-    renameOption: (id, name) => update('options', id, { name: name.slice(0, 80) }, { debounce: 400 }),
-    deleteOption: (id) => remove('options', id),
+    setDecision,
+    // Named lists share one shape: { items, create, rename, remove }.
+    optionList: {
+      items: options,
+      create: (name) => createNamed('options', name),
+      rename: (id, name) => update('options', id, { name: name.slice(0, 80) }, { debounce: 400 }),
+      remove: (id) => remove('options', id),
+    },
+    projects,
+    projectsById: data.projects,
+    projectList: {
+      items: projects,
+      create: (name) => createNamed('projects', name),
+      rename: (id, name) => update('projects', id, { name: name.slice(0, 80) }, { debounce: 400 }),
+      remove: (id) => remove('projects', id),
+    },
   }
 }

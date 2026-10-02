@@ -23,6 +23,15 @@ export const PRESTIGE_TIERS = [
 ]
 export const prestigeTier = (p) => (p ? PRESTIGE_TIERS.find((t) => p >= t.min) : null)
 
+// "Are we doing this?": doing (with a project), maybe, no, or undecided.
+export const DECISIONS = [
+  { id: 'doing', label: 'Doing' },
+  { id: 'maybe', label: 'Maybe' },
+  { id: 'no', label: 'No' },
+  { id: 'undecided', label: 'Undecided' },
+]
+export const decisionOf = (c) => (c.project_id ? 'doing' : c.decision === 'maybe' || c.decision === 'no' ? c.decision : 'undecided')
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export const isDate = (s) => typeof s === 'string' && DATE_RE.test(s) && !Number.isNaN(new Date(`${s}T00:00:00Z`).getTime())
 const dayNum = (iso) => Math.round(new Date(`${iso}T00:00:00Z`).getTime() / 86_400_000)
@@ -91,17 +100,18 @@ export const urgency = (days) => (days === null || days === undefined ? 'none' :
 // Filters: "#research" or "cat:soft" (category), ">7" / "p>=8" / "p:9"
 // (prestige), "soon" (a stage within 14 days).
 
-const FIELD_WEIGHTS = { name: 3, category: 1.5, items: 1.5, stages: 1, description: 1, host: 1 }
+const FIELD_WEIGHTS = { name: 3, category: 1.5, items: 1.5, project: 1.5, stages: 1, description: 1, host: 1 }
 const fold = (s) => String(s ?? '').toLowerCase()
 const splitWords = (s) => s.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
 
 /** Precompute normalized text per competition (memoize on the list). */
-export function buildIndex(comps, optionsById = {}) {
+export function buildIndex(comps, optionsById = {}, projectsById = {}) {
   return comps.map((c) => {
     const fields = {
       name: fold(c.name),
       category: fold(categoryLabel(c.category)),
       items: fold((c.submission_items ?? []).map((id) => optionsById[id]?.name ?? '').join(' · ')),
+      project: fold(projectsById[c.project_id]?.name),
       stages: fold(stages(c.timeline).map((s) => s.label).join(' · ')),
       description: fold(c.description),
       host: fold(hostOf(c.url ?? '')),
@@ -274,9 +284,12 @@ export function highlightRuns(text, indices) {
 export const SORTS = [
   { id: 'deadline', label: 'Next date' },
   { id: 'prestige', label: 'Prestige' },
+  { id: 'decision', label: 'Doing' },
   { id: 'name', label: 'Name' },
   { id: 'recent', label: 'Newest' },
 ]
+
+const DECISION_RANK = { doing: 0, maybe: 1, undecided: 2, no: 3 }
 
 export function sortCompetitions(list, sort, today, get = (x) => x) {
   const next = (c) => timelineState(c.timeline, today).daysToNext
@@ -284,6 +297,7 @@ export function sortCompetitions(list, sort, today, get = (x) => x) {
     // Upcoming soonest first; finished / undated at the bottom.
     deadline: (a, b) => (next(a) ?? 1e9) - (next(b) ?? 1e9) || (b.prestige ?? 0) - (a.prestige ?? 0),
     prestige: (a, b) => (b.prestige ?? 0) - (a.prestige ?? 0) || a.name.localeCompare(b.name),
+    decision: (a, b) => DECISION_RANK[decisionOf(a)] - DECISION_RANK[decisionOf(b)] || (next(a) ?? 1e9) - (next(b) ?? 1e9),
     name: (a, b) => a.name.localeCompare(b.name),
     recent: (a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''),
   }[sort]
@@ -310,14 +324,18 @@ export const MIN_PRESTIGE = [
   { id: 7, label: '7+' },
   { id: 9, label: '9+' },
 ]
-export const EMPTY_FILTERS = { categories: [], states: [], within: null, minPrestige: null, items: [], itemMode: 'any' }
+export const EMPTY_FILTERS = { categories: [], decisions: [], projects: [], states: [], within: null, minPrestige: null, items: [], itemMode: 'any' }
 
 /** Number of active filter groups (for the badge). */
 export const filterCount = (f) =>
-  (f.categories.length > 0) + (f.states.length > 0) + (f.within !== null) + (f.minPrestige !== null) + (f.items.length > 0)
+  (f.categories.length > 0) + (f.decisions.length > 0 || f.projects.length > 0) + (f.states.length > 0) + (f.within !== null) + (f.minPrestige !== null) + (f.items.length > 0)
 
 export function matchesFilters(c, f, tl) {
   if (f.categories.length && !f.categories.includes(c.category)) return false
+  // Decisions and projects are OR'd: "Maybe" + project X = maybe, or doing X.
+  if (f.decisions.length || f.projects.length) {
+    if (!f.decisions.includes(decisionOf(c)) && !(c.project_id && f.projects.includes(c.project_id))) return false
+  }
   if (f.states.length && !f.states.includes(tl.state)) return false
   if (f.within !== null && (tl.daysToNext === null || tl.daysToNext > f.within)) return false
   if (f.minPrestige !== null && !(c.prestige >= f.minPrestige)) return false
