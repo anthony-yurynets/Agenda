@@ -4,9 +4,11 @@ export function generateToken() {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-/** Public URL of an edit or booking link. */
+const ROUTE_PREFIX = { edit: 's', booking: 'b', group: 'g' }
+
+/** Public URL of an edit, booking or competition-group link. */
 export function linkUrl(link) {
-  return `${window.location.origin}/${link.kind === 'edit' ? 's' : 'b'}/${link.token}`
+  return `${window.location.origin}/${ROUTE_PREFIX[link.kind] ?? 's'}/${link.token}`
 }
 
 /** The hosted widget page for a widget link. `base` is your deployed site. */

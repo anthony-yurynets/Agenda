@@ -95,6 +95,15 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
     for (const x of store.competitions) for (const id of x.submission_items ?? []) u[id] = (u[id] ?? 0) + 1
     return u
   }, [store.competitions])
+  const groupUsage = useMemo(() => {
+    const u = {}
+    for (const x of store.competitions) for (const id of x.group_ids ?? []) u[id] = (u[id] ?? 0) + 1
+    return u
+  }, [store.competitions])
+  const toggleGroup = (id) => {
+    const groups = c.group_ids ?? []
+    update({ group_ids: groups.includes(id) ? groups.filter((x) => x !== id) : [...groups, id] })
+  }
   const toggleItem = (id) => {
     const items = c.submission_items ?? []
     update({ submission_items: items.includes(id) ? items.filter((x) => x !== id) : [...items, id] })
@@ -128,6 +137,9 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
 
         <span className="field-label">Are we doing this?</span>
         <DecisionPicker comp={c} store={store} onChange={(answer) => store.setDecision(c.id, answer)} />
+
+        <span className="field-label">Groups</span>
+        <OptionManager list={store.groupList} selected={c.group_ids ?? []} onToggle={toggleGroup} usage={groupUsage} placeholder="New group (e.g. Summer 2027)" noun="groups" />
 
         <label className="field">
           <span className="field-label">Link</span>

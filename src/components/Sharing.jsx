@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, Plus, Users } from 'lucide-react'
+import { CalendarClock, FolderOpen, Plus, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { format } from '../lib/dates'
 import { generateToken, linkUrl } from '../lib/shareLinks'
@@ -14,6 +14,7 @@ export default function Sharing({ toast }) {
   const [editTools, setEditTools] = useState(() => SHAREABLE_PAGES.map((p) => p.id))
   const [booking, setBooking] = useState({ name: '', slot: 30, uses: 1, expires: '' })
   const [busy, setBusy] = useState(false)
+  const [groups, setGroups] = useState({})
 
   useEffect(() => {
     supabase
@@ -26,6 +27,11 @@ export default function Sharing({ toast }) {
           setLinks([])
         } else setLinks(data)
       })
+    // Names for competition-group links (shared from the Competitions page).
+    supabase
+      .from('competition_groups')
+      .select('id, name')
+      .then(({ data }) => setGroups(Object.fromEntries((data ?? []).map((g) => [g.id, g.name]))))
   }, [toast])
 
   const create = async (row) => {
@@ -78,6 +84,7 @@ export default function Sharing({ toast }) {
 
   const editLinks = (links ?? []).filter((l) => l.kind === 'edit')
   const bookingLinks = (links ?? []).filter((l) => l.kind === 'booking')
+  const groupLinks = (links ?? []).filter((l) => l.kind === 'group')
 
   return (
     <div className="integrations sharing">
@@ -178,6 +185,25 @@ export default function Sharing({ toast }) {
         </form>
         <LinkList links={bookingLinks} loading={!links} onCopy={copy} onRevoke={revoke} empty="No booking links yet." />
       </section>
+
+      {groupLinks.length > 0 && (
+        <section className="panel">
+          <h3>
+            <FolderOpen size={17} /> Competition groups
+          </h3>
+          <p className="muted small">
+            View-only links to a group of competitions. Create them from a group’s <strong>Share</strong> button on the Competitions page.
+          </p>
+          <LinkList
+            links={groupLinks}
+            loading={!links}
+            onCopy={copy}
+            onRevoke={revoke}
+            empty=""
+            renderExtra={(l) => <small className="muted">Group: {groups[l.group_id] ?? '…'}</small>}
+          />
+        </section>
+      )}
     </div>
   )
 }

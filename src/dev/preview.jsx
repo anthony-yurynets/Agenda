@@ -41,6 +41,7 @@ fakeSupabase.tables.blocks.push(
 )
 const EDIT_TOKEN = 'preview-edit-token-0000000000000'
 const BOOK_TOKEN = 'preview-book-token-0000000000000'
+const GROUP_TOKEN = 'preview-group-token-000000000000'
 fakeSupabase.tables.share_links.push(
   { id: 'l1', user_id: 'u1', kind: 'edit', token: EDIT_TOKEN, name: 'Sam', created_at: new Date().toISOString() },
   { id: 'l2', user_id: 'u1', kind: 'booking', token: BOOK_TOKEN, name: 'Intro call', slot_minutes: 30, max_uses: 3, uses: 0,
@@ -92,12 +93,16 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   T.competition_projects.push(...P)
   const proj = (n) => P.find((x) => x.name === n).id
   const by = (...names) => names.map((n) => O.find((o) => o.name === n).id)
-  const comp = (o) => ({ id: crypto.randomUUID(), user_id: 'u1', url: '', description: '', prestige: null, category: 'other', submission_items: [], timeline: [], source: 'user', decision: null, project_id: null, created_at: new Date(Date.now() - Math.random() * 1e10).toISOString(), ...o })
+  const comp = (o) => ({ id: crypto.randomUUID(), user_id: 'u1', url: '', description: '', prestige: null, category: 'other', submission_items: [], group_ids: [], timeline: [], source: 'user', decision: null, project_id: null, created_at: new Date(Date.now() - Math.random() * 1e10).toISOString(), ...o })
+  const G = ['Summer 2027', 'Team picks'].map(opt)
+  T.competition_groups.push(...G)
+  const grp = (...names) => names.map((n) => G.find((x) => x.name === n).id)
+  T.share_links.push({ id: 'l3', user_id: 'u1', kind: 'group', group_id: G[0].id, token: GROUP_TOKEN, name: 'Coach', created_at: new Date().toISOString() })
   T.competitions.push(
-    comp({ project_id: proj('Microplastics study'), name: 'Regeneron International Science and Engineering Fair', url: 'https://www.societyforscience.org/isef/', category: 'research', prestige: 10, description: 'The world’s largest pre-college STEM competition. Qualify through an affiliated regional fair.', submission_items: by('Research paper', 'Poster', 'Abstract'), timeline: [{ label: 'Regional fair', date: day(-20) }, { label: 'State fair', date: day(12) }, { label: 'ISEF finals', date: day(60), end: day(65) }] }),
+    comp({ project_id: proj('Microplastics study'), group_ids: grp('Summer 2027', 'Team picks'), name: 'Regeneron International Science and Engineering Fair', url: 'https://www.societyforscience.org/isef/', category: 'research', prestige: 10, description: 'The world’s largest pre-college STEM competition. Qualify through an affiliated regional fair.', submission_items: by('Research paper', 'Poster', 'Abstract'), timeline: [{ label: 'Regional fair', date: day(-20) }, { label: 'State fair', date: day(12) }, { label: 'ISEF finals', date: day(60), end: day(65) }] }),
     comp({ project_id: proj('Study buddy app'), name: 'Congressional App Challenge', url: 'congressionalappchallenge.us', category: 'software', prestige: 7, description: 'Build an app; judged by your district’s member of Congress.', submission_items: by('Demo video', 'Source code'), timeline: [{ label: 'Registration', date: day(-30) }, { label: 'Submission deadline', date: day(3) }, { label: 'Winners announced', date: day(45) }] }),
-    comp({ decision: 'maybe', name: 'MIT THINK Scholars', url: 'https://think.mit.edu', category: 'research', prestige: 8, description: 'Research proposal competition with funding and mentorship from MIT students.', submission_items: by('Research paper', 'Essay'), timeline: [{ label: 'Proposal due', date: day(90) }, { label: 'Finalists', date: day(120) }] }),
-    comp({ project_id: proj('Solar drone'), name: 'Conrad Challenge', url: 'conradchallenge.org', category: 'innovation', prestige: 6, description: 'Team innovation challenge: aerospace, energy, health, and more.', submission_items: by('Slide deck', 'Prototype', 'Demo video'), source: 'ai', timeline: [{ label: 'Stage 1 · Idea', date: day(-1) }, { label: 'Stage 2 · Business plan', date: day(9) }, { label: 'Stage 3 · Pitch', date: day(29) }] }),
+    comp({ decision: 'maybe', group_ids: grp('Summer 2027'), name: 'MIT THINK Scholars', url: 'https://think.mit.edu', category: 'research', prestige: 8, description: 'Research proposal competition with funding and mentorship from MIT students.', submission_items: by('Research paper', 'Essay'), timeline: [{ label: 'Proposal due', date: day(90) }, { label: 'Finalists', date: day(120) }] }),
+    comp({ project_id: proj('Solar drone'), group_ids: grp('Summer 2027'), name: 'Conrad Challenge', url: 'conradchallenge.org', category: 'innovation', prestige: 6, description: 'Team innovation challenge: aerospace, energy, health, and more.', submission_items: by('Slide deck', 'Prototype', 'Demo video'), source: 'ai', timeline: [{ label: 'Stage 1 · Idea', date: day(-1) }, { label: 'Stage 2 · Business plan', date: day(9) }, { label: 'Stage 3 · Pitch', date: day(29) }] }),
     comp({ name: 'FIRST Robotics Competition', url: 'firstinspires.org', category: 'engineering', prestige: 7, submission_items: by('Prototype'), timeline: [{ label: 'Kickoff', date: day(95) }, { label: 'Regionals', date: day(150) }, { label: 'Championship', date: day(200) }] }),
     comp({ name: 'Google Code-in Hackathon', category: 'software', prestige: 4, submission_items: by('Source code', 'Demo video'), timeline: [{ label: 'Hacking', date: day(-60), end: day(-58) }, { label: 'Judging', date: day(-50) }] }),
     comp({ decision: 'no', name: 'Local essay contest', category: 'other', prestige: 2, submission_items: by('Essay') }),
@@ -108,10 +113,14 @@ globalThis.__VAPOR_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase
 
 // Run the real /api/share and /api/book handlers in the page against the fake DB.
-const [{ default: shareApi }, { default: bookApi }] = await Promise.all([import('../../api/share.js'), import('../../api/book.js')])
+const [{ default: shareApi }, { default: bookApi }, { default: groupApi }] = await Promise.all([
+  import('../../api/share.js'),
+  import('../../api/book.js'),
+  import('../../api/group.js'),
+])
 const realFetch = window.fetch.bind(window)
 window.fetch = async (url, init = {}) => {
-  const handler = { '/api/share': shareApi, '/api/book': bookApi }[url]
+  const handler = { '/api/share': shareApi, '/api/book': bookApi, '/api/group': groupApi }[url]
   if (!handler) return realFetch(url, init)
   let status = 200
   let body = ''
@@ -120,17 +129,21 @@ window.fetch = async (url, init = {}) => {
   return new Response(body, { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { default: BookingPage }] = await Promise.all([
+const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { default: BookingPage }, { default: SharedGroupPage }] = await Promise.all([
   import('react-dom/client'),
   import('../components/Workspace'),
   import('../components/SharedWorkspace'),
   import('../components/BookingPage'),
+  import('../components/competitions/SharedGroupPage'),
   import('../index.css'),
   import('../lib/theme'),
 ])
-// ?as=guest → edit-link view, ?as=booker → booking page, default → owner.
+// ?as=guest → edit-link view, ?as=booker → booking page, ?as=viewer → shared group, default → owner.
 const as = new URLSearchParams(location.search).get('as')
 const session = { user: { id: 'u1', email: 'you@example.com', user_metadata: { full_name: 'Preview User' } } }
 createRoot(document.getElementById('root')).render(
-  as === 'guest' ? <SharedWorkspace token={EDIT_TOKEN} /> : as === 'booker' ? <BookingPage token={BOOK_TOKEN} /> : <Workspace session={session} />,
+  as === 'guest' ? <SharedWorkspace token={EDIT_TOKEN} />
+    : as === 'booker' ? <BookingPage token={BOOK_TOKEN} />
+      : as === 'viewer' ? <SharedGroupPage token={GROUP_TOKEN} />
+        : <Workspace session={session} />,
 )

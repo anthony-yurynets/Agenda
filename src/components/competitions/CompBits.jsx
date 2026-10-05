@@ -160,10 +160,10 @@ export function OptionManager({ list, selected, onToggle, usage, startEditing = 
 const DECISION_ICON = { doing: Rocket, maybe: CircleHelp, no: X, undecided: CircleHelp }
 
 /** Read-only badge for a competition's "Are we doing this?" answer. */
-export function DecisionBadge({ comp, projectsById }) {
+export function DecisionBadge({ comp, projectsById, undecided = 'Decide' }) {
   const d = decisionOf(comp)
   const Icon = DECISION_ICON[d]
-  const label = d === 'doing' ? projectsById[comp.project_id]?.name ?? 'Doing' : d === 'maybe' ? 'Maybe' : d === 'no' ? 'Not doing' : 'Decide'
+  const label = d === 'doing' ? projectsById[comp.project_id]?.name ?? 'Doing' : d === 'maybe' ? 'Maybe' : d === 'no' ? 'Not doing' : undecided
   return (
     <span className={`decision d-${d}`}>
       <Icon size={12} aria-hidden="true" />

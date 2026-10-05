@@ -20,7 +20,8 @@ const INSTRUCTIONS =
   'Competitions: a tracker of contests the user may enter (name, link, description, prestige 1–10, category, ' +
   'submission items from their own option list, and a timeline of dated stages). Call list_submission_options ' +
   'before create_competition to reuse their item names; use list_competitions with a query to find one. ' +
-  '"Are we doing this?" is the `doing` field: a project name (yes, entering with it — see list_projects), maybe, or no.'
+  '"Are we doing this?" is the `doing` field: a project name (yes, entering with it — see list_projects), maybe, or no. ' +
+  'Competitions can be put in named groups with the `groups` field (see list_groups).'
 
 async function authenticate(req) {
   const token = bearer(req)

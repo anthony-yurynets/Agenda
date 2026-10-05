@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { CornerDownLeft, ExternalLink, ListChecks, Plus, Search, Trophy, X } from 'lucide-react'
+import { CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Plus, Search, Trophy, X } from 'lucide-react'
 import { useCompetitions } from '../state/useCompetitions'
 import { localToday } from '../state/useFitness'
 import {
@@ -28,15 +28,16 @@ import {
 import { CategoryPill, Countdown, DecisionPicker, Highlight, OptionManager, PrestigeMeter, TimelineTrack } from '../components/competitions/CompBits'
 import CompetitionPanel from '../components/competitions/CompetitionPanel'
 import CompFilter from '../components/competitions/CompFilter'
+import GroupShare from '../components/competitions/GroupShare'
 
 // Filters and sort are remembered per browser.
 const PREF_KEY = 'vapor:competitions'
 function readPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}')
-    return { sort: SORTS.some((x) => x.id === p.sort) ? p.sort : 'deadline', filters: { ...EMPTY_FILTERS, ...(p.filters ?? {}) } }
+    return { sort: SORTS.some((x) => x.id === p.sort) ? p.sort : 'deadline', filters: { ...EMPTY_FILTERS, ...(p.filters ?? {}) }, group: p.group ?? null }
   } catch {
-    return { sort: 'deadline', filters: EMPTY_FILTERS }
+    return { sort: 'deadline', filters: EMPTY_FILTERS, group: null }
   }
 }
 
@@ -47,7 +48,7 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
   const items = (c.submission_items ?? []).map((id) => store.optionsById[id]).filter(Boolean)
   const href = normalizeUrl(c.url)
   return (
-    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' || c.decision === 'no' ? 'finished' : ''}`} onClick={() => onOpen(c.id)}>
+    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' || c.decision === 'no' ? 'finished' : ''} ${c.project_id ? 'doing' : ''}`} onClick={() => onOpen(c.id)}>
       <td className="c-name">
         <span className="cat-edge" aria-hidden="true" />
         <button className="comp-open" onClick={(e) => (e.stopPropagation(), onOpen(c.id))} onKeyDown={onKeyNav} data-comp-row>
@@ -99,12 +100,26 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
 /** Competition tracker: instant search over a frosted table, editing in a side panel. */
 export default function CompetitionsPage({ session, toast }) {
   const store = useCompetitions(session.user.id, { onError: (m) => toast(m, 'error') })
-  const { competitions, optionsById, projectsById } = store
+  const { optionsById, projectsById, groupsById } = store
   const today = localToday()
 
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState(() => readPrefs().filters)
   const [sort, setSort] = useState(() => readPrefs().sort)
+  // The group the table is scoped to (null = all competitions).
+  const [groupPref, setGroup] = useState(() => readPrefs().group)
+  const groupId = groupPref && groupsById[groupPref] ? groupPref : null
+  const group = groupId ? groupsById[groupId] : null
+  const competitions = useMemo(
+    () => (groupId ? store.competitions.filter((c) => c.group_ids?.includes(groupId)) : store.competitions),
+    [store.competitions, groupId],
+  )
+  const groupCounts = useMemo(() => {
+    const u = {}
+    for (const c of store.competitions) for (const id of c.group_ids ?? []) u[id] = (u[id] ?? 0) + 1
+    return u
+  }, [store.competitions])
+  const [newGroup, setNewGroup] = useState(null)
   const [openId, setOpenId] = useState(null)
   const [itemsOpen, setItemsOpen] = useState(false)
   const [listTab, setListTab] = useState('items')
@@ -115,11 +130,11 @@ export default function CompetitionsPage({ session, toast }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PREF_KEY, JSON.stringify({ sort, filters }))
+      localStorage.setItem(PREF_KEY, JSON.stringify({ sort, filters, group: groupPref }))
     } catch {
       // Storage blocked: filters just won't persist.
     }
-  }, [sort, filters])
+  }, [sort, filters, groupPref])
   // Drop items that no longer exist (deleted options).
   const activeFilters = useMemo(
     () => ({ ...filters, items: filters.items.filter((id) => optionsById[id]), projects: filters.projects.filter((id) => projectsById[id]) }),
@@ -146,11 +161,15 @@ export default function CompetitionsPage({ session, toast }) {
     }
     return out
   }, [competitions, timelines])
+  // List usage counts (Lists menu) cover every competition, not just this group.
   const usage = useMemo(() => {
-    const u = {}
-    for (const c of competitions) for (const id of c.submission_items ?? []) u[id] = (u[id] ?? 0) + 1
+    const u = { items: {}, projects: {} }
+    for (const c of store.competitions) {
+      for (const id of c.submission_items ?? []) u.items[id] = (u.items[id] ?? 0) + 1
+      if (c.project_id) u.projects[c.project_id] = (u.projects[c.project_id] ?? 0) + 1
+    }
     return u
-  }, [competitions])
+  }, [store.competitions])
 
   // Every stage in the next 45 days, across competitions.
   const upNext = useMemo(
@@ -162,7 +181,7 @@ export default function CompetitionsPage({ session, toast }) {
     [competitions, timelines, today],
   )
 
-  const open = openId ? competitions.find((c) => c.id === openId) : null
+  const open = openId ? store.competitions.find((c) => c.id === openId) : null
   const nFilters = filterCount(activeFilters)
   const filtered = Boolean(query.trim() || nFilters)
   const setF = (patch) => setFilters((f) => ({ ...f, ...patch }))
@@ -215,7 +234,14 @@ export default function CompetitionsPage({ session, toast }) {
 
   const toggleCat = (id) => setF({ categories: filters.categories.includes(id) ? filters.categories.filter((x) => x !== id) : [...filters.categories, id] })
   const clearAll = () => (setQuery(''), setFilters(EMPTY_FILTERS))
-  const add = () => setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other' }))
+  const add = () =>
+    setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other', group_ids: groupId ? [groupId] : [] }))
+  const createGroup = (e) => {
+    e.preventDefault()
+    const id = store.groupList.create(newGroup ?? '')
+    if (id) setGroup(id)
+    setNewGroup(null)
+  }
 
   return (
     <div className="comps">
@@ -224,9 +250,9 @@ export default function CompetitionsPage({ session, toast }) {
           <div className="comps-title">
             <Trophy size={20} />
             <div>
-              <h2>Competitions</h2>
+              <h2>{group ? group.name : 'Competitions'}</h2>
               <p className="muted small">
-                {competitions.length} tracked
+                {competitions.length} {group ? 'in this group' : 'tracked'}
                 {upNext.length > 0 && ` · next date ${countdownLabel(daysBetween(today, upNext[0].s.date)).toLowerCase()}`}
               </p>
             </div>
@@ -265,6 +291,7 @@ export default function CompetitionsPage({ session, toast }) {
                     {[
                       ['items', 'Submission items'],
                       ['projects', 'Projects'],
+                      ['groups', 'Groups'],
                     ].map(([id, label]) => (
                       <button key={id} role="tab" aria-selected={listTab === id} className={listTab === id ? 'on' : ''} onClick={() => setListTab(id)}>
                         {label}
@@ -272,9 +299,11 @@ export default function CompetitionsPage({ session, toast }) {
                     ))}
                   </div>
                   {listTab === 'items' ? (
-                    <OptionManager key="items" list={store.optionList} usage={usage} startEditing />
+                    <OptionManager key="items" list={store.optionList} usage={usage.items} startEditing />
+                  ) : listTab === 'projects' ? (
+                    <OptionManager key="projects" list={store.projectList} usage={usage.projects} startEditing placeholder="New project (e.g. Solar drone)" noun="projects" />
                   ) : (
-                    <OptionManager key="projects" list={store.projectList} usage={counts.project} startEditing placeholder="New project (e.g. Solar drone)" noun="projects" />
+                    <OptionManager key="groups" list={store.groupList} usage={groupCounts} startEditing placeholder="New group (e.g. Summer 2027)" noun="groups" />
                   )}
                 </div>
               )}
@@ -284,6 +313,41 @@ export default function CompetitionsPage({ session, toast }) {
             </button>
           </div>
         </header>
+
+        <nav className="comp-groups" aria-label="Groups">
+          <FolderOpen size={15} className="muted" aria-hidden="true" />
+          <div className="chips" role="tablist">
+            {[{ id: null, name: 'All' }, ...store.groups].map((g) => (
+              <button key={g.id ?? 'all'} role="tab" aria-selected={groupId === g.id} className={`chip group-chip ${groupId === g.id ? 'on' : ''}`} onClick={() => setGroup(g.id)}>
+                {g.name}
+                <span className="chip-count">{g.id ? (groupCounts[g.id] ?? 0) : store.competitions.length}</span>
+              </button>
+            ))}
+          </div>
+          {newGroup === null ? (
+            <button className="btn ghost sm" onClick={() => setNewGroup('')}>
+              <Plus size={13} /> Group
+            </button>
+          ) : (
+            <form className="group-new" onSubmit={createGroup}>
+              <input
+                autoFocus
+                placeholder="Group name"
+                value={newGroup}
+                maxLength={80}
+                aria-label="New group name"
+                onChange={(e) => setNewGroup(e.target.value)}
+                onBlur={() => !newGroup.trim() && setNewGroup(null)}
+                onKeyDown={(e) => e.key === 'Escape' && setNewGroup(null)}
+              />
+              <button className="btn primary sm" disabled={!newGroup.trim()}>
+                Create
+              </button>
+            </form>
+          )}
+          <span className="flex1" />
+          {group && <GroupShare key={group.id} group={group} toast={toast} />}
+        </nav>
 
         <div className="comps-filters">
           <div className="chips" role="group" aria-label="Filter by category">
@@ -388,8 +452,10 @@ export default function CompetitionsPage({ session, toast }) {
               ) : (
                 <>
                   <Trophy size={26} className="muted" />
-                  <p>Track your first competition.</p>
-                  <p className="muted small">Add one, or ask your AI to research and add competitions for you.</p>
+                  <p>{group ? `Nothing in ${group.name} yet.` : 'Track your first competition.'}</p>
+                  <p className="muted small">
+                    {group ? 'Add one here, or open any competition and pick this group.' : 'Add one, or ask your AI to research and add competitions for you.'}
+                  </p>
                   <button className="btn primary sm" onClick={add}>
                     <Plus size={14} /> Add competition
                   </button>

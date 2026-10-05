@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the parts of supabase-js the app uses.
-const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [] }
+const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [], competition_groups: [] }
 let clock = 0
 const stamp = () => new Date(Date.UTC(2026, 0, 1) + ++clock).toISOString()
 
@@ -29,6 +29,7 @@ class Query {
   lte(col, val) { this.filters.push((r) => r[col] != null && r[col] <= val); return this }
   eq(col, val) { this.filters.push((r) => r[col] === val); return this }
   in(col, vals) { this.filters.push((r) => vals.includes(r[col])); return this }
+  contains(col, vals) { this.filters.push((r) => vals.every((v) => (r[col] ?? []).includes(v))); return this }
   not(col) { this.filters.push((r) => r[col] !== null && r[col] !== undefined); return this }
   or(expr) {
     const groups = [...expr.matchAll(/and\(([^)]*)\)/g)].map((m) => m[1].split(',').map(parseCond))
@@ -70,6 +71,10 @@ class Query {
         tables.workout_sets = tables.workout_sets.filter((x) => ex.has(x.exercise_id))
       }
       if (this.table === 'competition_projects') for (const c of tables.competitions) if (doomed.has(c.project_id)) c.project_id = null
+      if (this.table === 'competition_groups') {
+        for (const c of tables.competitions) c.group_ids = (c.group_ids ?? []).filter((x) => !doomed.has(x))
+        tables.share_links = tables.share_links.filter((l) => !doomed.has(l.group_id))
+      }
       if (this.table === 'competition_options') for (const c of tables.competitions) c.submission_items = (c.submission_items ?? []).filter((x) => !doomed.has(x))
       return { data: null, error: null }
     }

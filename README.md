@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0010_competitions.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0012_competition_groups.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -81,13 +81,25 @@ search, ↑/↓ to move through rows, Enter to open. **Filter** narrows by categ
 dates), next date within 7/30/90 days, minimum prestige, and submission items (needs any or all); active filters show
 as removable chips and are remembered per browser. The logic lives in [`src/lib/competitions.js`](src/lib/competitions.js).
 
-Submission items come from your own option list (**Items** in the header, or *Edit list* in a competition):
+**Are we doing this?** Every competition has an answer, set right from the table's *Doing?* column or the side panel:
+pick one of your projects (yes — that's what you're entering with), *Maybe*, or *No* (the row dims). Add a project
+inline from the picker; manage the list under **Lists → Projects** (deleting one sends its competitions back to
+undecided). Filter by answer or project, sort by *Doing*, and search matches project names.
+
+**Groups** collect competitions into named lists (a competition can be in several). Pick a group in the bar above
+the filters to scope the table to it (new competitions you add there join it), create one with **+ Group**, and
+add or remove a competition from groups in its side panel. Manage the list under **Lists → Groups** (deleting a group
+keeps its competitions). A selected group's **Share** button creates view-only links (`/g/<token>`): anyone with one
+sees that group's competitions, search and details without signing in, kept up to date, and can't edit anything.
+
+Submission items come from your own option list (**Lists → Submission items**, or *Edit list* in a competition):
 add, rename or delete options; deleting one removes it from every competition. Timeline stages take a date or a
 "Day N" (Day 1 = the first stage) and an optional end date.
 
 Your AI can manage it over MCP: `list_competitions` (with the same search), `get_competition`,
 `create_competition`, `update_competition`, `delete_competition`, `list_submission_options`,
-`manage_submission_options`. Try: *"Find 5 prestigious research competitions for high schoolers and add them with
+`manage_submission_options`, `list_projects`, `manage_projects` (set the answer with the `doing` field), `list_groups`,
+`manage_groups` (put competitions in groups with the `groups` field; filter `list_competitions` by `group`). Try: *"Find 5 prestigious research competitions for high schoolers and add them with
 their deadlines."*
 
 ## Sharing
@@ -102,7 +114,10 @@ Open **Sharing** in the sidebar.
   (in a block's details; works with repeating blocks too). A booking becomes a sub-block of that block. Other blocks
   at the same time count as busy. Times show in the visitor's own time zone.
 
-Guests never access the database directly: `api/share.js` and `api/book.js` check the token and act on your behalf
+- **Competition group links** (`/g/<token>`): view-only, created from a group's **Share** button on the
+  Competitions page; they're listed here too.
+
+Guests never access the database directly: `api/share.js`, `api/book.js` and `api/group.js` check the token and act on your behalf
 with the service-role key.
 
 ## Notion widget
@@ -130,4 +145,4 @@ Zoom stays anchored where your fingers are; double-click the time-zone corner to
 
 `npm run dev`, then open http://localhost:5173/preview.html. It runs the real app against an in-memory
 backend with sample data (dev server only; it's not part of the production build). Add `?as=guest` to see the
-edit-link view, or `?as=booker` for the booking page.
+edit-link view, `?as=booker` for the booking page, or `?as=viewer` for a shared competition group.

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql and 0011_competition_projects.sql in the Supabase SQL editor to enable Competitions.'
-const TABLE = { comps: 'competitions', options: 'competition_options', projects: 'competition_projects' }
+const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql through 0012_competition_groups.sql in the Supabase SQL editor to enable Competitions.'
+const TABLE = { comps: 'competitions', options: 'competition_options', projects: 'competition_projects', groups: 'competition_groups' }
 
 /**
- * Competitions and submission-item options for the signed-in owner. Writes
+ * Competitions and their lists (submission items, projects, groups) for the signed-in owner. Writes
  * are optimistic and go through a serial queue; realtime keeps AI edits live.
  */
 export function useCompetitions(userId, { onError } = {}) {
-  const [data, setData] = useState({ comps: {}, options: {}, projects: {} })
+  const [data, setData] = useState({ comps: {}, options: {}, projects: {}, groups: {} })
   const [loading, setLoading] = useState(true)
   const ref = useRef(data)
   const errorRef = useRef(onError)
@@ -35,7 +35,7 @@ export function useCompetitions(userId, { onError } = {}) {
   }
   const report = (err) => {
     const m = err?.message ?? ''
-    errorRef.current?.(/competition|project_id|decision/.test(m) && /relation|schema|exist/.test(m) ? MIGRATION_HINT : m || 'Something went wrong')
+    errorRef.current?.(/competition|project_id|decision|group_ids/.test(m) && /relation|schema|exist/.test(m) ? MIGRATION_HINT : m || 'Something went wrong')
   }
 
   const enqueue = useCallback((ids, fn, rollback) => {
@@ -56,13 +56,13 @@ export function useCompetitions(userId, { onError } = {}) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [c, o, p] = await Promise.all(Object.values(TABLE).map((t) => supabase.from(t).select('*')))
+      const [c, o, p, g] = await Promise.all(Object.values(TABLE).map((t) => supabase.from(t).select('*')))
       if (cancelled) return
       setLoading(false)
-      const error = c.error ?? o.error ?? p.error
+      const error = c.error ?? o.error ?? p.error ?? g.error
       if (error) return report(error)
       const byId = (rows) => Object.fromEntries(rows.map((r) => [r.id, r]))
-      commit(() => ({ comps: byId(c.data), options: byId(o.data), projects: byId(p.data) }))
+      commit(() => ({ comps: byId(c.data), options: byId(o.data), projects: byId(p.data), groups: byId(g.data) }))
     })()
     return () => {
       cancelled = true
@@ -160,6 +160,12 @@ export function useCompetitions(userId, { onError } = {}) {
         if (key === 'projects') {
           next.comps = Object.fromEntries(Object.entries(prev.comps).map(([cid, c]) => [cid, c.project_id === id ? { ...c, project_id: null } : c]))
         }
+        // …and deleting a group takes its competitions out of it.
+        if (key === 'groups') {
+          next.comps = Object.fromEntries(
+            Object.entries(prev.comps).map(([cid, c]) => [cid, c.group_ids?.includes(id) ? { ...c, group_ids: c.group_ids.filter((x) => x !== id) } : c]),
+          )
+        }
         return next
       })
       enqueue([id], () => supabase.from(TABLE[key]).delete().eq('id', id), () => commit(() => snapshot))
@@ -178,6 +184,7 @@ export function useCompetitions(userId, { onError } = {}) {
         prestige: null,
         category: 'other',
         submission_items: [],
+        group_ids: [],
         timeline: [],
         source: 'user',
         created_at: new Date().toISOString(),
@@ -210,6 +217,7 @@ export function useCompetitions(userId, { onError } = {}) {
   const sorted = (map) => Object.values(map).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
   const options = useMemo(() => sorted(data.options), [data.options])
   const projects = useMemo(() => sorted(data.projects), [data.projects])
+  const groups = useMemo(() => sorted(data.groups), [data.groups])
 
   return {
     loading,
@@ -234,6 +242,14 @@ export function useCompetitions(userId, { onError } = {}) {
       create: (name) => createNamed('projects', name),
       rename: (id, name) => update('projects', id, { name: name.slice(0, 80) }, { debounce: 400 }),
       remove: (id) => remove('projects', id),
+    },
+    groups,
+    groupsById: data.groups,
+    groupList: {
+      items: groups,
+      create: (name) => createNamed('groups', name),
+      rename: (id, name) => update('groups', id, { name: name.slice(0, 80) }, { debounce: 400 }),
+      remove: (id) => remove('groups', id),
     },
   }
 }

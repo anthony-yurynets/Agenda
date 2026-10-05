@@ -291,6 +291,9 @@ export const SORTS = [
 
 const DECISION_RANK = { doing: 0, maybe: 1, undecided: 2, no: 3 }
 
+/** Competitions we're entering that aren't over yet — pinned to the top of every sort. */
+export const isPinned = (c, today) => decisionOf(c) === 'doing' && timelineState(c.timeline, today).state !== 'finished'
+
 export function sortCompetitions(list, sort, today, get = (x) => x) {
   const next = (c) => timelineState(c.timeline, today).daysToNext
   const by = {
@@ -301,7 +304,7 @@ export function sortCompetitions(list, sort, today, get = (x) => x) {
     name: (a, b) => a.name.localeCompare(b.name),
     recent: (a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''),
   }[sort]
-  return [...list].sort((x, y) => by(get(x), get(y)))
+  return [...list].sort((x, y) => isPinned(get(y), today) - isPinned(get(x), today) || by(get(x), get(y)))
 }
 
 // ─── Filters ────────────────────────────────────────────────────────────────

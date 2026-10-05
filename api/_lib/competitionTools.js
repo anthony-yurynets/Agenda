@@ -1,5 +1,5 @@
 // MCP tools for the Competitions page: search, create, edit and delete
-// competitions and the user's submission-item options. All queries are scoped
+// competitions and the user's lists (submission items, projects, groups). All queries are scoped
 // to `userId` (service-role client).
 
 import {
@@ -45,6 +45,11 @@ const fieldProps = {
     description: 'What must be submitted, by option name (e.g. ["Research paper", "Demo video"]). Unknown names are added to the user\'s option list. Replaces the current list.',
   },
   timeline: { type: 'array', items: stageSchema, description: 'All stages / important dates. Replaces the current timeline.' },
+  groups: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Groups this competition is in, by name (e.g. ["Summer 2027"]). Unknown names are added to the user\'s group list. Replaces the current list.',
+  },
   doing: {
     type: ['string', 'null'],
     description:
@@ -67,6 +72,7 @@ export const COMPETITION_TOOLS = [
         category: { type: 'string', enum: CATEGORY_IDS },
         upcoming_within_days: { type: 'integer', minimum: 0, description: 'Only competitions with a stage in the next N days.' },
         doing: { type: 'string', enum: ['doing', 'maybe', 'no', 'undecided'], description: 'Only competitions with this answer to "Are we doing this?".' },
+        group: { type: 'string', description: 'Only competitions in this group (name or id).' },
       },
     },
     annotations: { readOnlyHint: true },
@@ -129,6 +135,30 @@ export const COMPETITION_TOOLS = [
     annotations: { destructiveHint: true },
   },
   {
+    name: 'list_groups',
+    title: 'List competition groups',
+    description: 'The user\'s competition groups (named collections; a competition can be in several), with the competitions in each.',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'manage_groups',
+    title: 'Manage competition groups',
+    description: 'Add, rename or delete competition groups. Deleting a group removes it from its competitions and turns off its share links (the competitions stay).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        add: { type: 'array', items: { type: 'string' } },
+        rename: {
+          type: 'array',
+          items: { type: 'object', properties: { from: { type: 'string', description: 'Current name or id' }, to: { type: 'string' } }, required: ['from', 'to'] },
+        },
+        remove: { type: 'array', items: { type: 'string' }, description: 'Names or ids.' },
+      },
+    },
+    annotations: { destructiveHint: true },
+  },
+  {
     name: 'manage_submission_options',
     title: 'Manage submission item options',
     description: 'Add, rename or delete submission item options. Deleting an option removes it from every competition.',
@@ -164,6 +194,7 @@ async function todayFor(sb, userId) {
 const loadNamed = async (sb, userId, table) => unwrap(await sb.from(table).select('*').eq('user_id', userId)).sort((a, b) => a.position - b.position)
 const loadOptions = (sb, userId) => loadNamed(sb, userId, 'competition_options')
 const loadProjects = (sb, userId) => loadNamed(sb, userId, 'competition_projects')
+const loadGroups = (sb, userId) => loadNamed(sb, userId, 'competition_groups')
 
 function findOption(options, ref) {
   const key = String(ref ?? '').trim().toLowerCase()
@@ -236,6 +267,7 @@ async function cleanFields(sb, userId, f) {
   }
   if (f.timeline !== undefined) patch.timeline = cleanTimeline(f.timeline)
   if (f.submission_items !== undefined) patch.submission_items = await resolveItems(sb, userId, f.submission_items)
+  if (f.groups !== undefined) patch.group_ids = await resolveNamed(sb, userId, 'competition_groups', f.groups)
   if (f.doing !== undefined) {
     const v = f.doing === null ? null : String(f.doing).trim()
     if (!v) Object.assign(patch, { decision: null, project_id: null })
@@ -249,7 +281,7 @@ async function cleanFields(sb, userId, f) {
   return patch
 }
 
-function shape(c, optionsById, projectsById, today) {
+function shape(c, optionsById, projectsById, groupsById, today) {
   const tl = timelineState(c.timeline, today)
   return {
     id: c.id,
@@ -262,6 +294,7 @@ function shape(c, optionsById, projectsById, today) {
     submission_items: (c.submission_items ?? []).map((id) => optionsById[id]?.name).filter(Boolean),
     doing: decisionOf(c),
     project: c.project_id ? projectsById[c.project_id]?.name : undefined,
+    groups: (c.group_ids ?? []).map((id) => groupsById[id]?.name).filter(Boolean),
     timeline: tl.stages.map((s) => ({ label: s.label, date: s.date, end: s.end, day: s.day })),
     status: tl.state,
     next_stage: tl.next ? { label: tl.next.label, date: tl.next.date, days_until: tl.daysToNext } : null,
@@ -279,28 +312,33 @@ async function loadOne(sb, userId, id) {
 const byId = (rows) => Object.fromEntries(rows.map((o) => [o.id, o]))
 
 async function shapeOne(sb, userId, c) {
-  const [options, projects, today] = await Promise.all([loadOptions(sb, userId), loadProjects(sb, userId), todayFor(sb, userId)])
-  return shape(c, byId(options), byId(projects), today)
+  const [options, projects, groups, today] = await Promise.all([loadOptions(sb, userId), loadProjects(sb, userId), loadGroups(sb, userId), todayFor(sb, userId)])
+  return shape(c, byId(options), byId(projects), byId(groups), today)
 }
 
 // ─── implementations ───────────────────────────────────────────────────────
 
 export const competitionImpl = {
-  async list_competitions(sb, userId, { query = '', category, upcoming_within_days, doing }) {
+  async list_competitions(sb, userId, { query = '', category, upcoming_within_days, doing, group }) {
     must(category === undefined || CATEGORY_IDS.includes(category), `category must be one of ${CATEGORY_IDS.join(', ')}`)
-    const [comps, options, projects, today] = await Promise.all([
+    const [comps, options, projects, groups, today] = await Promise.all([
       sb.from('competitions').select('*').eq('user_id', userId).then(unwrap),
       loadOptions(sb, userId),
       loadProjects(sb, userId),
+      loadGroups(sb, userId),
       todayFor(sb, userId),
     ])
     const optionsById = byId(options)
     const projectsById = byId(projects)
+    const groupsById = byId(groups)
+    const inGroup = group === undefined ? null : findOption(groups, group)
+    must(group === undefined || inGroup, `No group named "${group}"`)
     let hits = searchCompetitions(buildIndex(comps, optionsById, projectsById), query, { today }).map((r) => r.comp)
     if (!String(query).trim()) hits = sortCompetitions(hits, 'deadline', today)
     if (category) hits = hits.filter((c) => c.category === category)
     if (doing) hits = hits.filter((c) => decisionOf(c) === doing)
-    let out = hits.map((c) => shape(c, optionsById, projectsById, today))
+    if (inGroup) hits = hits.filter((c) => c.group_ids?.includes(inGroup.id))
+    let out = hits.map((c) => shape(c, optionsById, projectsById, groupsById, today))
     if (upcoming_within_days !== undefined) out = out.filter((c) => c.next_stage && c.next_stage.days_until <= upcoming_within_days)
     return { today, count: out.length, categories: CATEGORIES.map((c) => c.id), competitions: out }
   },
@@ -349,5 +387,15 @@ export const competitionImpl = {
   async manage_projects(sb, userId, args) {
     await manageNamed(sb, userId, 'competition_projects', args)
     return competitionImpl.list_projects(sb, userId)
+  },
+
+  async list_groups(sb, userId) {
+    const [groups, comps] = await Promise.all([loadGroups(sb, userId), sb.from('competitions').select('name, group_ids').eq('user_id', userId).then(unwrap)])
+    return groups.map((g) => ({ id: g.id, name: g.name, competitions: comps.filter((c) => c.group_ids?.includes(g.id)).map((c) => c.name) }))
+  },
+
+  async manage_groups(sb, userId, args) {
+    await manageNamed(sb, userId, 'competition_groups', args)
+    return competitionImpl.list_groups(sb, userId)
   },
 }
