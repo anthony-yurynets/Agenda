@@ -15,6 +15,9 @@ export const ASSIGNMENT_STATUSES = [
 export const assignmentStatusLabel = (id) => ASSIGNMENT_STATUSES.find((s) => s.id === id)?.label ?? id
 export const kindLabel = (id) => KINDS.find((k) => k.id === id)?.label ?? id
 
+/** Exams have no status: they're never "done", only past. */
+export const isDone = (a) => a.kind !== 'exam' && a.status === 'done'
+
 /** Click-to-cycle order for a card's status pill. */
 export const nextAssignmentStatus = (s) => {
   const order = ASSIGNMENT_STATUSES.map((x) => x.id)
@@ -24,11 +27,9 @@ export const nextAssignmentStatus = (s) => {
 /** Monday of the week containing `date` (YYYY-MM-DD). */
 export const weekStartOf = (date) => addDaysISO(date, -['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(weekdayOf(date)))
 
-export const weekDates = (monday) => Array.from({ length: 7 }, (_, i) => addDaysISO(monday, i))
-
 /** Order inside a day: open work first, exams before assignments, then oldest first. */
 export function sortAssignments(list) {
-  const done = (a) => (a.status === 'done' ? 1 : 0)
+  const done = (a) => (isDone(a) ? 1 : 0)
   return [...list].sort(
     (a, b) => done(a) - done(b) || (a.kind === 'exam' ? 0 : 1) - (b.kind === 'exam' ? 0 : 1) || (a.created_at ?? '').localeCompare(b.created_at ?? ''),
   )

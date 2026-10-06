@@ -196,19 +196,21 @@ export default function AssignmentEditor({ assignment, dash, onClose, onAnother,
           <span>Due</span>
           <input type="date" value={draft.due_date} onChange={(e) => e.target.value && set({ due_date: e.target.value })} />
         </label>
-        <label className="ae-row">
-          <span>Status</span>
-          <select className={`ae-select as-${draft.status}`} value={draft.status} onChange={(e) => set({ status: e.target.value })}>
-            {ASSIGNMENT_STATUSES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {draft.kind !== 'exam' && (
+          <label className="ae-row">
+            <span>Status</span>
+            <select className={`ae-select as-${draft.status}`} value={draft.status} onChange={(e) => set({ status: e.target.value })}>
+              {ASSIGNMENT_STATUSES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="ae-row">
           <span>Type</span>
-          <select className="ae-select" value={draft.kind} onChange={(e) => set({ kind: e.target.value })}>
+          <select className="ae-select" value={draft.kind} onChange={(e) => set(e.target.value === 'exam' ? { kind: 'exam', status: 'not_started' } : { kind: e.target.value })}>
             {KINDS.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.label}

@@ -57,14 +57,18 @@ that id to `update_block` or `delete_block` affects only that date. Passing the 
 ## Agenda
 
 Where the app opens. **Add assignment** (`A`) and **Add exam** (`E`) open a quick editor with the title focused:
-type it, then `Tab` through Due (tomorrow by default), Status (Not started), Type (set by the button) and Subject.
+type it, then `Tab` through Due (tomorrow by default), Status (Not started; assignments only), Type (set by the button) and Subject.
 `Esc`, `Enter` or clicking away saves and closes; `⌘/Ctrl+Enter` saves and starts another with the same type, date and
 subject. Untitled new items are dropped. Subject is a combobox: type to filter, `Tab`/`Enter` picks the highlighted one,
 and a new name is created on the spot (rename or delete subjects under **Subjects**).
 
-- **The week:** seven day boxes (Mon–Sun, no times) of cards showing title, status, type and subject. Click a card to
-  edit it, its status pill to cycle the status, a day to add something due then; drag a card to another day to move it.
-  Overdue unfinished work is listed at the top.
+- **The week:** an endless strip of day boxes (no times) that opens on today and loads more days as you scroll either
+  way; the arrows move a screenful, **Today** jumps back. Each day fits two cards across and three down, and scrolls
+  inside if there are more. Cards show title, status, subject and type. Click a card to edit it, its status pill to cycle
+  the status, a day to add something due then; drag a card to another day to move it. Overdue unfinished assignments are
+  listed at the top.
+- **Exams have no status:** they show an Exam badge instead, the editor hides the Status field for them, and a past
+  exam just fades rather than counting as overdue.
 - **Coming up:** the next 5 calendar events (repeats included, canceled ones skipped). Click one to open it in the same
   panel as on the Calendar. To keep an event out (sleep, school), turn off **Show in Coming up** in its panel; on a
   repeat it applies to the whole series, or one day if you're editing a single occurrence.

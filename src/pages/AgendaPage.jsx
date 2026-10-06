@@ -3,7 +3,7 @@ import { BookOpen, ClipboardList, GraduationCap, Tags } from 'lucide-react'
 import { useAgenda } from '../state/useAgenda'
 import { addDaysISO } from '../lib/domain'
 import { nowMinutes, todayISO } from '../lib/dates'
-import { UPCOMING_DAYS, upcomingEvents } from '../lib/agenda'
+import { UPCOMING_DAYS, isDone, upcomingEvents } from '../lib/agenda'
 import { OptionManager } from '../components/competitions/CompBits'
 import AssignmentEditor from '../components/agenda/AssignmentEditor'
 import WeekBoard, { AssignmentCard } from '../components/agenda/WeekBoard'
@@ -88,10 +88,10 @@ export default function AgendaPage({ session, store, toast }) {
   })
 
   const stats = useMemo(() => {
-    const open = dash.assignments.filter((a) => a.status !== 'done')
+    const open = dash.assignments.filter((a) => !isDone(a))
     const weekEnd = addDaysISO(today, 6)
     return {
-      overdue: open.filter((a) => a.due_date < today).sort((a, b) => a.due_date.localeCompare(b.due_date)),
+      overdue: open.filter((a) => a.kind !== 'exam' && a.due_date < today).sort((a, b) => a.due_date.localeCompare(b.due_date)),
       dueToday: open.filter((a) => a.due_date === today).length,
       dueWeek: open.filter((a) => a.due_date >= today && a.due_date <= weekEnd).length,
       exams: open.filter((a) => a.kind === 'exam' && a.due_date >= today && a.due_date <= weekEnd).length,

@@ -1329,9 +1329,16 @@ input:disabled { color: var(--muted); }
 /* Week board: seven day boxes, cards stacked in each. */
 .wb .tile-head .date-nav { gap: 2px; }
 .wb-range { font-size: 13px; font-weight: 600; margin-right: 4px; font-variant-numeric: tabular-nums; }
-.wb-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.wb-days {
+  --card-h: 92px;
+  --day-w: max(330px, calc((100% - 24px) / 4)); /* wide enough for two cards side by side */
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: -6px;
+  scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: thin;
+  overflow-anchor: none; /* prepending days is compensated in WeekBoard */
+}
 .wb-day {
-  display: flex; flex-direction: column; min-width: 0; min-height: 230px; padding: 8px; border-radius: 12px;
+  flex: 0 0 var(--day-w); scroll-snap-align: start;
+  display: flex; flex-direction: column; min-width: 0; padding: 8px; border-radius: 12px;
   background: var(--fill); transition: background 0.12s, box-shadow 0.12s;
 }
 .wb-day.past { background: var(--hairline-soft); }
@@ -1341,6 +1348,7 @@ input:disabled { color: var(--muted); }
 .wb-day-head { display: flex; align-items: center; gap: 6px; padding: 0 0 8px 2px; min-height: 30px; }
 .wb-dow { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 .wb-dom { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.wb-month { font-size: 12px; font-weight: 600; color: var(--accent); }
 .wb-day.today .wb-dow { color: var(--accent); }
 .wb-day.today .wb-dom {
   display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 8px;
@@ -1349,12 +1357,18 @@ input:disabled { color: var(--muted); }
 .wb-add { opacity: 0; transition: opacity 0.12s; }
 .wb-day:hover .wb-add, .wb-add:focus-visible { opacity: 1; }
 @media (hover: none) { .wb-add { opacity: 1; } }
-.wb-cards { flex: 1; display: flex; flex-direction: column; gap: 6px; cursor: pointer; border-radius: 8px; }
+/* Two cards across, three rows tall; more scroll inside the day. */
+.wb-cards {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: var(--card-h); gap: 6px; align-content: start;
+  height: calc(var(--card-h) * 3 + 12px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  cursor: pointer; border-radius: 8px;
+}
+.wb-cards .as-card { height: var(--card-h); }
 .wb-hint { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 12px 2px 0; }
 
 /* Assignment card */
 .as-card {
-  position: relative; display: grid; gap: 5px; min-width: 0; padding: 8px 9px 8px 12px; border-radius: 10px; cursor: pointer; overflow: hidden;
+  position: relative; display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 7px 8px 7px 11px; border-radius: 10px; cursor: pointer; overflow: hidden;
   background: var(--glass-strong); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
   box-shadow: inset 0 0 0 1px var(--glass-edge), 0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
@@ -1364,14 +1378,14 @@ input:disabled { color: var(--muted); }
 .as-card:active { cursor: grabbing; }
 .as-card.selected { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
 .as-card.overdue { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--exam) 45%, transparent), 0 0 0 1px var(--hairline); }
-.as-card.as-done { opacity: 0.6; }
+.as-card.as-done, .as-card.past { opacity: 0.6; }
 .as-card.as-done .as-title { text-decoration: line-through; text-decoration-color: var(--muted); }
 .as-title {
-  font-size: 13px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere;
+  font-size: 12.5px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; flex-shrink: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .as-meta { display: flex; flex-wrap: wrap; gap: 4px; }
-.as-status, .as-kind {
+.as-status, .as-kind, .as-exam {
   display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 6px;
   font-size: 11px; font-weight: 600; white-space: nowrap;
 }
@@ -1379,8 +1393,12 @@ input:disabled { color: var(--muted); }
 .as-status:hover { background: color-mix(in srgb, var(--as) 26%, transparent); }
 .as-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--as); }
 .as-kind { color: var(--ink-2); background: var(--fill-hover); }
-.as-card.k-exam .as-kind { color: var(--exam); background: color-mix(in srgb, var(--exam) 13%, transparent); }
+.as-exam { color: var(--exam); background: color-mix(in srgb, var(--exam) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--exam) 30%, transparent); }
+.as-foot { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: auto; }
+.as-foot .as-subject { flex: 1; min-width: 0; }
+.as-foot .as-kind { height: auto; padding: 0; background: none; font-size: 10.5px; font-weight: 500; color: var(--muted); flex-shrink: 0; }
 .as-subject { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.as-subject:empty::before { display: none; }
 .as-subject::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; background: var(--subj); }
 
 /* Coming up */
@@ -1465,13 +1483,11 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
 .dash > .block-panel { top: 0; right: 0; bottom: 0; }
 
 @media (max-width: 1240px) {
-  .wb-days { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(136px, 1fr); overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .wb-days { --day-w: 330px; }
 }
 @media (max-width: 720px) {
   .dash-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'week' 'soon' 'links'; }
-  .wb-days { grid-auto-flow: row; grid-auto-columns: auto; display: flex; flex-direction: column; overflow: visible; }
-  .wb-day { min-height: 0; }
-  .wb-cards { min-height: 8px; }
+  .wb-days { --day-w: calc(100% - 28px); } /* one day, with the next peeking in */
   .dh-actions { width: 100%; }
   .dh-actions .btn.primary { flex: 1; }
   .ql-add { grid-template-columns: minmax(0, 1fr) auto auto; }
