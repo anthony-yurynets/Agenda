@@ -129,8 +129,8 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   const L = [['Google Classroom', 'https://classroom.google.com'], ['', 'https://www.khanacademy.org'], ['Desmos', 'https://www.desmos.com/calculator'], ['Gmail', 'https://mail.google.com']]
   T.dashboard_links.push(...L.map(([title, url], i) => ({ id: crypto.randomUUID(), user_id: 'u1', title, url, position: i, created_at: new Date().toISOString() })))
 }
-globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase
-globalThis.__VAPOR_TEST_DB__ = fakeSupabase
+globalThis.__AGENDA_FAKE_SUPABASE__ = fakeSupabase
+globalThis.__AGENDA_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase
 
 // Run the real /api/share and /api/book handlers in the page against the fake DB.

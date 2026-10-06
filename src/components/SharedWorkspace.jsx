@@ -21,7 +21,7 @@ export default function SharedWorkspace({ token }) {
         <div className="auth-card">
           <div className="auth-brand">
             <Logo size={30} />
-            <span>Vapor</span>
+            <span>Agenda</span>
           </div>
           <h1>This link doesn’t work</h1>
           <p className="muted">{state.message} Ask the person who shared it for a new one.</p>

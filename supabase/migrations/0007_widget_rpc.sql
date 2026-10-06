@@ -1,4 +1,4 @@
--- Database functions for the standalone Notion widget file (vapor-widget.html).
+-- Database functions for the standalone Notion widget file (agenda-widget.html).
 -- The file is hosted by Notion, not by this app, so it can't reach /api/share.
 -- Instead it calls these functions directly with the public anon key plus a
 -- widget token; they check the token and act on the owner's behalf.

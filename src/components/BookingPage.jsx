@@ -84,7 +84,7 @@ export default function BookingPage({ token }) {
         <header className="booking-head">
           <div className="auth-brand">
             <Logo size={26} />
-            <span>Vapor</span>
+            <span>Agenda</span>
           </div>
           {info && (
             <>

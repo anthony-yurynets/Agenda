@@ -1,4 +1,4 @@
--- Vapor schema: categories, nested blocks, and personal API tokens for MCP.
+-- Agenda schema: categories, nested blocks, and personal API tokens for MCP.
 -- Run in the Supabase SQL editor (or `supabase db push`).
 
 create extension if not exists pgcrypto;

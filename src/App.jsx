@@ -42,7 +42,7 @@ function SetupNotice() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <h1>Vapor needs Supabase credentials</h1>
+        <h1>Agenda needs Supabase credentials</h1>
         <p className="muted">
           Copy <code>.env.example</code> to <code>.env</code>, fill in <code>VITE_SUPABASE_URL</code> and{' '}
           <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>, then restart the dev server.

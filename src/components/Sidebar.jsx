@@ -32,7 +32,7 @@ export default function Sidebar({ page, setPage, store, hiddenCats, toggleCatego
     <aside className="sidebar">
       <div className="brand">
         <Logo size={26} />
-        <span>Vapor</span>
+        <span>Agenda</span>
         <button className="icon-btn only-mobile" onClick={onClose} aria-label="Close menu">
           <X size={18} />
         </button>

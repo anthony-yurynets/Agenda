@@ -47,7 +47,7 @@ export function ownerBackend(userId) {
     /** Live changes (from the MCP server, shared editors, bookings, other tabs). */
     subscribe({ onBlock, onBlockDelete, onCategory, onCategoryDelete }) {
       const channel = supabase
-        .channel(`vapor-${userId}`)
+        .channel(`calendar-${userId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks', filter: `user_id=eq.${userId}` }, (p) =>
           p.eventType === 'DELETE' ? onBlockDelete(p.old?.id) : onBlock(p.new),
         )
@@ -57,7 +57,7 @@ export function ownerBackend(userId) {
         .subscribe()
       // Deletes aren't filterable by column, so listen unfiltered for those.
       const deletes = supabase
-        .channel(`vapor-del-${userId}`)
+        .channel(`calendar-del-${userId}`)
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'blocks' }, (p) => onBlockDelete(p.old?.id))
         .subscribe()
       return () => {

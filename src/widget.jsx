@@ -1,5 +1,5 @@
 // The Notion widget page (/widget.html#t=<token>). Notion frames it, either via
-// the downloaded vapor-widget.html wrapper or an /embed block. It reaches your
+// the downloaded agenda-widget.html wrapper or an /embed block. It reaches your
 // calendar through the widget database functions using the token in the URL.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

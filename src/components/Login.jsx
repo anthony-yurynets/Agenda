@@ -24,7 +24,7 @@ export default function Login() {
       <div className="auth-card">
         <div className="auth-brand">
           <Logo size={30} />
-          <span>Vapor</span>
+          <span>Agenda</span>
         </div>
         <h1>Sign in</h1>
         <p className="muted">A calendar made of blocks you can split into smaller blocks.</p>

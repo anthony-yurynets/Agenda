@@ -122,7 +122,7 @@ export default function SharedGroupPage({ token }) {
   }, [index, deferredQuery, today])
 
   useEffect(() => {
-    if (data?.group.name) document.title = `${data.group.name} · Vapor`
+    if (data?.group.name) document.title = `${data.group.name} · Agenda`
   }, [data])
 
   if (state.status === 'loading') return <div className="boot"><div className="spinner" /></div>
@@ -132,7 +132,7 @@ export default function SharedGroupPage({ token }) {
         <div className="auth-card">
           <div className="auth-brand">
             <Logo size={30} />
-            <span>Vapor</span>
+            <span>Agenda</span>
           </div>
           <h1>This link doesn’t work</h1>
           <p className="muted">{state.message} Ask the person who shared it for a new one.</p>

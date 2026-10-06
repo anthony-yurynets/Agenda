@@ -15,7 +15,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 function readZoom() {
   try {
-    const v = Number(localStorage.getItem('vapor:zoom'))
+    const v = Number(localStorage.getItem('agenda:zoom'))
     return v >= MIN_PPM && v <= MAX_PPM ? v : DEFAULT_PPM
   } catch {
     return DEFAULT_PPM
@@ -81,7 +81,7 @@ export default function WeekView({ days, store, blocks, visible, allDay = [], se
     if (a && el) el.scrollTop = (headRef.current?.offsetHeight ?? 0) + a.minute * ppm - a.y
     zoomAnchor.current = null
     try {
-      localStorage.setItem('vapor:zoom', String(ppm))
+      localStorage.setItem('agenda:zoom', String(ppm))
     } catch {
       /* storage unavailable */
     }

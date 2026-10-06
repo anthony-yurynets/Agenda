@@ -5,10 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#e7eaee" />
-    <title>Vapor</title>
+    <title>Agenda</title>
     <script>
       try {
-        var p = localStorage.getItem('vapor:theme') || 'system'
+        var p = localStorage.getItem('agenda:theme') || 'system'
         var d = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = d ? 'dark' : 'light'
       } catch (e) {

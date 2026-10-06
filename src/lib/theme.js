@@ -1,6 +1,6 @@
 // Theme preference: 'system' | 'light' | 'dark'. The resolved value lives on
 // <html data-theme>, set before first paint by the inline script in index.html.
-const KEY = 'vapor:theme'
+const KEY = 'agenda:theme'
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 
 export function getThemePref() {

@@ -10,7 +10,7 @@ function Notice({ title, children }) {
       <div className="auth-card">
         <div className="auth-brand">
           <Logo size={26} />
-          <span>Vapor</span>
+          <span>Agenda</span>
         </div>
         <h1>{title}</h1>
         {children}
@@ -47,7 +47,7 @@ export default function WidgetApp({ config }) {
     return (
       <Notice title="Widget not connected">
         <p className="muted">
-          This widget link is missing its key. In Vapor, open <strong>Integrations → Notion widget</strong> and copy the
+          This widget link is missing its key. In Agenda, open <strong>Integrations → Notion widget</strong> and copy the
           embed link (or download the widget file) again.
         </p>
       </Notice>

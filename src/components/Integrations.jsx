@@ -13,7 +13,7 @@ async function sha256Hex(text) {
 function generateToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  return `vpr_${b64}`
+  return `agd_${b64}`
 }
 
 const TOOL_LIST = [
@@ -69,14 +69,14 @@ export default function Integrations({ toast }) {
 
   const shown = fresh ?? '<YOUR_TOKEN>'
   const snippets = {
-    'Claude Code': `claude mcp add --transport http vapor ${endpoint} \\\n  --header "Authorization: Bearer ${shown}"`,
+    'Claude Code': `claude mcp add --transport http agenda ${endpoint} \\\n  --header "Authorization: Bearer ${shown}"`,
     'Claude Desktop': JSON.stringify(
       {
         mcpServers: {
-          vapor: {
+          agenda: {
             command: 'npx',
-            args: ['-y', 'mcp-remote', endpoint, '--header', 'Authorization:Bearer ${VAPOR_TOKEN}'],
-            env: { VAPOR_TOKEN: shown },
+            args: ['-y', 'mcp-remote', endpoint, '--header', 'Authorization:Bearer ${AGENDA_TOKEN}'],
+            env: { AGENDA_TOKEN: shown },
           },
         },
       },
@@ -207,7 +207,7 @@ function CopyField({ value, mono, block }) {
 
 // Where the widget page lives. Notion can't reach localhost, so links made while
 // developing locally still point at the deployed site.
-const SITE_URL = 'https://vapor.anthonyy.me'
+const SITE_URL = 'https://agenda.anthonyy.me'
 const widgetBase = () => (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) ? SITE_URL : window.location.origin)
 
 /** Notion widget links. Each works like a private edit link, used by /widget.html. */
@@ -237,8 +237,8 @@ function NotionWidget({ toast }) {
   }
 
   const download = (link) => {
-    downloadBlob(widgetWrapperFile(widgetUrl(link, widgetBase())), 'vapor-widget.html')
-    toast('vapor-widget.html downloaded — add it to your Notion page')
+    downloadBlob(widgetWrapperFile(widgetUrl(link, widgetBase())), 'agenda-widget.html')
+    toast('agenda-widget.html downloaded — add it to your Notion page')
   }
 
   const create = async () => {
@@ -271,7 +271,7 @@ function NotionWidget({ toast }) {
       </h3>
       <p className="muted small">
         Your full calendar inside a Notion page. Create a widget, then in Notion type <code>/embed</code> and paste the
-        link, or add the downloaded <code>vapor-widget.html</code> file. It opens without signing in, so keep that page
+        link, or add the downloaded <code>agenda-widget.html</code> file. It opens without signing in, so keep that page
         private. Served from <code>{widgetBase()}</code>.
       </p>
       <div className="token-form">

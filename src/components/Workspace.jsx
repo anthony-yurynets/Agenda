@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { useVapor } from '../state/useVapor'
+import { useCalendar } from '../state/useCalendar'
 import { addDays, toISODate, visibleDays } from '../lib/dates'
 import { STATUSES } from '../lib/domain'
 import Sidebar from './Sidebar'
@@ -22,14 +22,14 @@ const SETTINGS_PAGES = ['sharing', 'integrations']
 
 const readPref = (key, fallback) => {
   try {
-    return JSON.parse(localStorage.getItem(`vapor:${key}`)) ?? fallback
+    return JSON.parse(localStorage.getItem(`agenda:${key}`)) ?? fallback
   } catch {
     return fallback
   }
 }
 const writePref = (key, value) => {
   try {
-    localStorage.setItem(`vapor:${key}`, JSON.stringify(value))
+    localStorage.setItem(`agenda:${key}`, JSON.stringify(value))
   } catch {
     /* storage unavailable */
   }
@@ -99,7 +99,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   const { toasts, push: toast, dismiss } = useToasts()
 
   // Calendar data stays loaded (and live) while you're on other pages.
-  const store = useVapor(backend, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
+  const store = useCalendar(backend, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
   const { categories } = store
 
   useEffect(() => writePref('view', calView), [calView])

@@ -15,7 +15,7 @@ export function linkUrl(link) {
 export const widgetUrl = (link, base = window.location.origin) => `${base.replace(/\/+$/, '')}/widget.html#t=${link.token}`
 
 /**
- * vapor-widget.html: a tiny page that frames the hosted widget. (Notion's HTML
+ * agenda-widget.html: a tiny page that frames the hosted widget. (Notion's HTML
  * blocks can't talk to Supabase directly — their security policy only allows
  * a few CDNs — so the calendar itself has to live on your site.)
  */
@@ -26,14 +26,14 @@ export function widgetWrapperFile(url) {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Vapor</title>
+<title>Agenda</title>
 <style>
   html, body { margin: 0; height: 100%; background: transparent; }
   iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>
 <body>
-<iframe src="${safe}" title="Vapor calendar" allow="clipboard-write"></iframe>
+<iframe src="${safe}" title="Agenda calendar" allow="clipboard-write"></iframe>
 </body>
 </html>
 `

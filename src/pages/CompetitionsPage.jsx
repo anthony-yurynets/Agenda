@@ -31,7 +31,7 @@ import CompFilter from '../components/competitions/CompFilter'
 import GroupShare from '../components/competitions/GroupShare'
 
 // Filters and sort are remembered per browser.
-const PREF_KEY = 'vapor:competitions'
+const PREF_KEY = 'agenda:competitions'
 function readPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}')

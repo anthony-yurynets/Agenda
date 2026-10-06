@@ -5,7 +5,7 @@ const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Dev-only escape hatch used by preview.html to run the UI against an in-memory backend.
-const fake = import.meta.env.DEV ? globalThis.__VAPOR_FAKE_SUPABASE__ : null
+const fake = import.meta.env.DEV ? globalThis.__AGENDA_FAKE_SUPABASE__ : null
 
 export const isConfigured = Boolean(fake || (url && anonKey))
 

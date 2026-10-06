@@ -72,7 +72,7 @@ const MIGRATION_HINT = 'Your database is missing a migration: run the files in s
  * The calendar store. `backend` decides where data lives: the signed-in owner's
  * Supabase tables, or the share-link API for a guest editor (see lib/backends).
  */
-export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
+export function useCalendar(backend, { rangeStart, rangeEnd, onError }) {
   const userId = backend.userId
   const [blocks, setBlocks] = useState({})
   const [categories, setCategories] = useState([])

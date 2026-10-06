@@ -1,4 +1,4 @@
-# Vapor
+# Agenda
 
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
@@ -45,7 +45,7 @@ Supabase's Redirect URLs.
 In the app, open **Integrations**, create a token, and copy one of the snippets. For example, in Claude Code:
 
 ```bash
-claude mcp add --transport http vapor https://your-app.vercel.app/api/mcp --header "Authorization: Bearer vpr_..."
+claude mcp add --transport http agenda https://your-app.vercel.app/api/mcp --header "Authorization: Bearer agd_..."
 ```
 
 Tools: `list_categories`, `create_category`, `list_blocks`, `get_block`, `create_block` (with nested `sub_blocks`
@@ -139,8 +139,8 @@ with the service-role key.
 
 Open **Integrations → Notion widget → Create widget**. Then either:
 
-- in Notion type `/embed` and paste the copied link (`https://vapor.anthonyy.me/widget.html#t=…`), or
-- use **Download .html** and add `vapor-widget.html` to the page (it just frames that same link).
+- in Notion type `/embed` and paste the copied link (`https://agenda.anthonyy.me/widget.html#t=…`), or
+- use **Download .html** and add `agenda-widget.html` to the page (it just frames that same link).
 
 The widget is the full calendar (grid, agenda, quick-create, sub-blocks, repeats, all-day spines, zoom, categories,
 themes) without sharing or integrations. It lives on your deployed site because Notion's HTML blocks may only

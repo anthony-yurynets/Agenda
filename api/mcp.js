@@ -1,6 +1,6 @@
-// Vapor MCP server — Streamable HTTP transport, stateless, JSON responses.
+// Agenda MCP server — Streamable HTTP transport, stateless, JSON responses.
 // Deployed as a Vercel serverless function at /api/mcp.
-// Auth: `Authorization: Bearer vpr_...` (personal token created in the app).
+// Auth: `Authorization: Bearer agd_...` (personal token created in the app).
 
 import { createHash } from 'node:crypto'
 import { TOOLS, runTool } from './_lib/tools.js'
@@ -8,9 +8,9 @@ import { db } from './_lib/db.js'
 import { send, readBody, bearer } from './_lib/http.js'
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
-const SERVER_INFO = { name: 'vapor', title: 'Vapor Calendar', version: '1.0.0' }
+const SERVER_INFO = { name: 'agenda', title: 'Agenda Calendar', version: '1.0.0' }
 const INSTRUCTIONS =
-  'Vapor is a time-block calendar. Blocks have a title, date (YYYY-MM-DD), start/end time ' +
+  'Agenda is a time-block calendar. Blocks have a title, date (YYYY-MM-DD), start/end time ' +
   '(HH:MM, 24h, local time), a category and a status (planned, in_progress, done, canceled, or none for ' +
   'fixed commitments like sleep or school). ' +
   'Any block can be divided into sub-blocks, which must fall on the same date and inside the ' +
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
   }
   if (!userId) {
     return send(res, 401, rpcError(null, -32001, 'Missing or invalid API token'), {
-      'WWW-Authenticate': 'Bearer realm="vapor"',
+      'WWW-Authenticate': 'Bearer realm="agenda"',
     })
   }
 

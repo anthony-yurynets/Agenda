@@ -5,7 +5,7 @@ let admin
 /** Service-role Supabase client (bypasses RLS — always scope queries to a user). */
 export function db() {
   // Test hook: node tests inject an in-memory client.
-  if (globalThis.__VAPOR_TEST_DB__) return globalThis.__VAPOR_TEST_DB__
+  if (globalThis.__AGENDA_TEST_DB__) return globalThis.__AGENDA_TEST_DB__
   if (!admin) {
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
