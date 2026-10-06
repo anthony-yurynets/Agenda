@@ -3,7 +3,7 @@
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
 
-- **Pages:** tabs across the top (Dashboard — where the app opens, Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+- **Pages:** tabs across the top (Agenda — where the app opens, Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
   in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
@@ -54,7 +54,7 @@ and an optional `repeat` rule), `update_block`, `divide_block`, `delete_block`.
 Repeating blocks appear in `list_blocks` once per occurrence, with ids like `<series id>::2026-10-05`. Passing
 that id to `update_block` or `delete_block` affects only that date. Passing the series id affects every occurrence.
 
-## Dashboard
+## Agenda
 
 Where the app opens. **Add assignment** (`A`) and **Add exam** (`E`) open a quick editor with the title focused:
 type it, then `Tab` through Due (tomorrow by default), Status (Not started), Type (set by the button) and Subject.
@@ -150,7 +150,7 @@ the widget off in Integrations to revoke it.
 
 ## Shortcuts
 
-Dashboard: `A` new assignment · `E` new exam. Calendar: `N` new block · `T` today · `←/→` previous/next · `/` search · `C`/`L` calendar/list · `Esc` close · `Delete` delete selected ·
+Agenda: `A` new assignment · `E` new exam. Calendar: `N` new block · `T` today · `←/→` previous/next · `/` search · `C`/`L` calendar/list · `Esc` close · `Delete` delete selected ·
 In quick-create: `Enter` save, `Esc` discard, `Alt+1…9` pick category.
 
 **Zoom the time axis:** pinch with two fingers on a trackpad or touchscreen (or Ctrl + scroll) over the calendar.

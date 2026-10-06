@@ -1,6 +1,6 @@
 import { CalendarClock } from 'lucide-react'
 import { fromMinutes } from '../../lib/domain'
-import { whenLabel } from '../../lib/dashboard'
+import { whenLabel } from '../../lib/agenda'
 import StatusIcon from '../StatusIcon'
 
 /** The next few calendar events. Clicking one opens it like on the Calendar. */

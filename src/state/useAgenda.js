@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { CATEGORY_PALETTE } from '../lib/domain'
 
-const MIGRATION_HINT = 'Run supabase/migrations/0013_dashboard.sql in the Supabase SQL editor to enable the Dashboard.'
+const MIGRATION_HINT = 'Run supabase/migrations/0013_dashboard.sql in the Supabase SQL editor to enable the Agenda.'
 const TABLE = { assignments: 'assignments', subjects: 'assignment_subjects', links: 'dashboard_links' }
 
 /**
- * Dashboard data for the signed-in owner: assignments/exams, the subject list
+ * Agenda data for the signed-in owner: assignments/exams, the subject list
  * and quick links. Writes are optimistic and go through a serial queue;
  * realtime keeps other tabs live.
  */
-export function useDashboard(userId, { onError } = {}) {
+export function useAgenda(userId, { onError } = {}) {
   const [data, setData] = useState({ assignments: {}, subjects: {}, links: {} })
   const [loading, setLoading] = useState(true)
   const ref = useRef(data)
@@ -84,7 +84,7 @@ export function useDashboard(userId, { onError } = {}) {
         return { ...prev, [key]: map }
       })
     }
-    const channel = supabase.channel(`dashboard-${userId}`)
+    const channel = supabase.channel(`agenda-${userId}`)
     for (const [key, table] of Object.entries(TABLE)) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` }, apply(key))
       // Deletes aren't filterable by column.

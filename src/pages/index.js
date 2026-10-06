@@ -1,4 +1,4 @@
-import { CalendarDays, Dumbbell, FlaskConical, LayoutDashboard, Trophy } from 'lucide-react'
+import { CalendarDays, Dumbbell, FlaskConical, ListTodo, Trophy } from 'lucide-react'
 
 /**
  * Top-level pages, shown as tabs in the top bar (in this order). To add a page:
@@ -7,7 +7,7 @@ import { CalendarDays, Dumbbell, FlaskConical, LayoutDashboard, Trophy } from 'l
  * any data a shareable page uses (see api/share.js).
  */
 export const PAGES = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, shareable: false },
+  { id: 'agenda', label: 'Agenda', icon: ListTodo, shareable: false },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, shareable: true },
   { id: 'fitness', label: 'Fitness', icon: Dumbbell, shareable: false },
   { id: 'competitions', label: 'Competitions', icon: Trophy, shareable: false },

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, ClipboardList, GraduationCap, Tags } from 'lucide-react'
-import { useDashboard } from '../state/useDashboard'
+import { useAgenda } from '../state/useAgenda'
 import { addDaysISO } from '../lib/domain'
 import { nowMinutes, todayISO } from '../lib/dates'
-import { UPCOMING_DAYS, upcomingEvents } from '../lib/dashboard'
+import { UPCOMING_DAYS, upcomingEvents } from '../lib/agenda'
 import { OptionManager } from '../components/competitions/CompBits'
-import AssignmentEditor from '../components/dashboard/AssignmentEditor'
-import WeekBoard, { AssignmentCard } from '../components/dashboard/WeekBoard'
-import Upcoming from '../components/dashboard/Upcoming'
-import QuickLinks from '../components/dashboard/QuickLinks'
+import AssignmentEditor from '../components/agenda/AssignmentEditor'
+import WeekBoard, { AssignmentCard } from '../components/agenda/WeekBoard'
+import Upcoming from '../components/agenda/Upcoming'
+import QuickLinks from '../components/agenda/QuickLinks'
 import BlockPanel from '../components/BlockPanel'
 
 const greeting = (mins) => (mins < 5 * 60 ? 'Good evening' : mins < 12 * 60 ? 'Good morning' : mins < 18 * 60 ? 'Good afternoon' : 'Good evening')
@@ -18,8 +18,8 @@ const greeting = (mins) => (mins < 5 * 60 ? 'Good evening' : mins < 12 * 60 ? 'G
  * what's coming up on the calendar, and quick links. Calendar events open in
  * the same panel as on the Calendar page.
  */
-export default function DashboardPage({ session, store, toast }) {
-  const dash = useDashboard(session.user.id, { onError: (m) => toast(m, 'error') })
+export default function AgendaPage({ session, store, toast }) {
+  const dash = useAgenda(session.user.id, { onError: (m) => toast(m, 'error') })
 
   // The clock drives "Coming up" and "today"; tick every minute.
   const [clock, setClock] = useState(() => ({ today: todayISO(), mins: nowMinutes() }))

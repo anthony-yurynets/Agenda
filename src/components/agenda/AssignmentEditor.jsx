@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
-import { ASSIGNMENT_STATUSES, KINDS } from '../../lib/dashboard'
+import { ASSIGNMENT_STATUSES, KINDS } from '../../lib/agenda'
 
 const FIELDS = ['title', 'kind', 'status', 'due_date', 'subject_id']
 

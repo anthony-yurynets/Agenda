@@ -108,7 +108,7 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
     comp({ decision: 'no', name: 'Local essay contest', category: 'other', prestige: 2, submission_items: by('Essay') }),
   )
 }
-// Dashboard sample data: subjects, this week's assignments and exams, quick links.
+// Agenda sample data: subjects, this week's assignments and exams, quick links.
 {
   const T = fakeSupabase.tables
   const day = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }

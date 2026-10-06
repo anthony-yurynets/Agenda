@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { hostOf, normalizeUrl } from '../../lib/competitions'
-import { faviconUrl } from '../../lib/dashboard'
+import { faviconUrl } from '../../lib/agenda'
 
 function Favicon({ host, title }) {
   const [failed, setFailed] = useState(false)

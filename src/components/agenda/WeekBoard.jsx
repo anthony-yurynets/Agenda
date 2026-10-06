@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { addDaysISO } from '../../lib/domain'
-import { assignmentStatusLabel, kindLabel, nextAssignmentStatus, sortAssignments, weekDates, weekStartOf } from '../../lib/dashboard'
+import { assignmentStatusLabel, kindLabel, nextAssignmentStatus, sortAssignments, weekDates, weekStartOf } from '../../lib/agenda'
 
 const fmt = (iso, opts) => new Date(`${iso}T12:00`).toLocaleDateString(undefined, opts)
 

@@ -224,7 +224,7 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
           <label className="toggle-row">
             <span>
               <strong>Show in Coming up</strong>
-              <small>List it on the dashboard’s Coming up{editingSeries ? ', every time it repeats' : isOccurrence ? ' (this day only)' : ''}.</small>
+              <small>List it in the Agenda’s Coming up{editingSeries ? ', every time it repeats' : isOccurrence ? ' (this day only)' : ''}.</small>
             </span>
             <input
               type="checkbox"

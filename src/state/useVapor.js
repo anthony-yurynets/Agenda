@@ -188,7 +188,7 @@ export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
     }
   }, [backend, rangeStart, rangeEnd, tick, commit, upsertLocal])
 
-  /** Load an extra date range into the store (the dashboard's "Coming up"). Owner only: guests' polls replace the store. */
+  /** Load an extra date range into the store (the Agenda's "Coming up"). Owner only: guests' polls replace the store. */
   const loadRange = useCallback(
     async (from, to) => {
       if (backend.pollMs) return
