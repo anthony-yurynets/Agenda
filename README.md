@@ -3,7 +3,7 @@
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
 
-- **Pages:** tabs across the top (Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+- **Pages:** tabs across the top (Dashboard — where the app opens, Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
   in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0012_competition_groups.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0013_dashboard.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -54,7 +54,22 @@ and an optional `repeat` rule), `update_block`, `divide_block`, `delete_block`.
 Repeating blocks appear in `list_blocks` once per occurrence, with ids like `<series id>::2026-10-05`. Passing
 that id to `update_block` or `delete_block` affects only that date. Passing the series id affects every occurrence.
 
-## Fitness
+## Dashboard
+
+Where the app opens. **Add assignment** (`A`) and **Add exam** (`E`) open a quick editor with the title focused:
+type it, then `Tab` through Due (tomorrow by default), Status (Not started), Type (set by the button) and Subject.
+`Esc`, `Enter` or clicking away saves and closes; `⌘/Ctrl+Enter` saves and starts another with the same type, date and
+subject. Untitled new items are dropped. Subject is a combobox: type to filter, `Tab`/`Enter` picks the highlighted one,
+and a new name is created on the spot (rename or delete subjects under **Subjects**).
+
+- **The week:** seven day boxes (Mon–Sun, no times) of cards showing title, status, type and subject. Click a card to
+  edit it, its status pill to cycle the status, a day to add something due then; drag a card to another day to move it.
+  Overdue unfinished work is listed at the top.
+- **Coming up:** the next 5 calendar events (repeats included, canceled ones skipped). Click one to open it in the same
+  panel as on the Calendar. To keep an event out (sleep, school), turn off **Show in Coming up** in its panel; on a
+  repeat it applies to the whole series, or one day if you're editing a single occurrence.
+- **Quick links:** add a URL (name optional) and it shows as a favicon tile; **Edit** to rename or remove.
+
 
 A bento dashboard: a body map colored by how recovered each muscle is (fresh → fatigued, with "fresh in ~Xh"),
 a frosted workout timeline, this week's weekday sessions against your goal, a weekly streak, today's plan or a
@@ -135,7 +150,7 @@ the widget off in Integrations to revoke it.
 
 ## Shortcuts
 
-`N` new block · `T` today · `←/→` previous/next · `/` search · `C`/`L` calendar/list · `Esc` close · `Delete` delete selected ·
+Dashboard: `A` new assignment · `E` new exam. Calendar: `N` new block · `T` today · `←/→` previous/next · `/` search · `C`/`L` calendar/list · `Esc` close · `Delete` delete selected ·
 In quick-create: `Enter` save, `Esc` discard, `Alt+1…9` pick category.
 
 **Zoom the time axis:** pinch with two fingers on a trackpad or touchscreen (or Ctrl + scroll) over the calendar.

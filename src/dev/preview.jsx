@@ -26,7 +26,7 @@ fakeSupabase.tables.blocks.push(
   // Series started last week: weekday gym at 07:30, with a sub-block template.
   row({ id: 'gym', title: 'Gym', date: d(-7), start_time: '07:30', end_time: '08:30', category_id: 'c2', repeat: { freq: 'weekly', interval: 1, days: ['mon', 'wed', 'fri'] } }),
   row({ parent_id: 'gym', title: 'Warm-up', date: d(-7), start_time: '07:30', end_time: '07:45', category_id: 'c2' }),
-  row({ id: 'school', title: 'School', date: d(-7), start_time: '12:30', end_time: '15:30', category_id: 'c3', status: 'none', repeat: { freq: 'weekly', interval: 1, days: ['mon', 'tue', 'wed', 'thu', 'fri'] } }),
+  row({ id: 'school', title: 'School', date: d(-7), start_time: '12:30', end_time: '15:30', category_id: 'c3', status: 'none', hide_upcoming: true, repeat: { freq: 'weekly', interval: 1, days: ['mon', 'tue', 'wed', 'thu', 'fri'] } }),
   row({ id: '22222222-2222-4222-8222-222222222222', title: 'Office hours', date: d(-7), start_time: '15:00', end_time: '17:00', category_id: 'c0', status: 'none', bookable: true, repeat: { freq: 'weekly', interval: 1, days: ['tue', 'thu'] } }),
   row({ id: '33333333-3333-4333-8333-333333333333', title: 'Design conference', date: d(2), start_time: '00:00', end_time: '24:00', all_day: true, category_id: 'c0', status: 'none' }),
   row({ parent_id: '33333333-3333-4333-8333-333333333333', title: 'Keynote', date: d(2), start_time: '09:00', end_time: '10:30', category_id: 'c0' }),
@@ -107,6 +107,27 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
     comp({ name: 'Google Code-in Hackathon', category: 'software', prestige: 4, submission_items: by('Source code', 'Demo video'), timeline: [{ label: 'Hacking', date: day(-60), end: day(-58) }, { label: 'Judging', date: day(-50) }] }),
     comp({ decision: 'no', name: 'Local essay contest', category: 'other', prestige: 2, submission_items: by('Essay') }),
   )
+}
+// Dashboard sample data: subjects, this week's assignments and exams, quick links.
+{
+  const T = fakeSupabase.tables
+  const day = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
+  const S = [['Chemistry', '#3b82f6'], ['English', '#8b5cf6'], ['Calculus', '#f97316'], ['History', '#14b8a6']].map(([name, color], i) => ({ id: crypto.randomUUID(), user_id: 'u1', name, color, position: i, created_at: new Date().toISOString() }))
+  T.assignment_subjects.push(...S)
+  const subj = (n) => S.find((x) => x.name === n).id
+  const a = (title, due, subject, o = {}) => ({ id: crypto.randomUUID(), user_id: 'u1', title, due_date: day(due), subject_id: subj(subject), kind: 'assignment', status: 'not_started', created_at: new Date(Date.now() - Math.random() * 1e9).toISOString(), ...o })
+  T.assignments.push(
+    a('Lab report: titration', -2, 'Chemistry'),
+    a('Read ch. 5–6, The Great Gatsby', 0, 'English', { status: 'in_progress' }),
+    a('Problem set 4', 1, 'Calculus'),
+    a('Unit 3 test', 2, 'Chemistry', { kind: 'exam' }),
+    a('Essay outline', 2, 'English', { status: 'done' }),
+    a('Primary source analysis', 3, 'History'),
+    a('Derivatives quiz', 4, 'Calculus', { kind: 'exam' }),
+    a('Vocab list 7', -1, 'English', { status: 'done' }),
+  )
+  const L = [['Google Classroom', 'https://classroom.google.com'], ['', 'https://www.khanacademy.org'], ['Desmos', 'https://www.desmos.com/calculator'], ['Gmail', 'https://mail.google.com']]
+  T.dashboard_links.push(...L.map(([title, url], i) => ({ id: crypto.randomUUID(), user_id: 'u1', title, url, position: i, created_at: new Date().toISOString() })))
 }
 globalThis.__VAPOR_FAKE_SUPABASE__ = fakeSupabase
 globalThis.__VAPOR_TEST_DB__ = fakeSupabase

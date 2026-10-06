@@ -27,6 +27,7 @@ const fromRow = (r) => ({
   recurrence_date: r.recurrence_date ?? null,
   bookable: r.bookable ?? false,
   all_day: r.all_day ?? false,
+  hide_upcoming: r.hide_upcoming ?? false,
 })
 
 const toRow = (b, userId) => ({
@@ -47,6 +48,8 @@ const toRow = (b, userId) => ({
   recurrence_date: b.recurrence_date ?? null,
   bookable: b.bookable ?? false,
   all_day: b.all_day ?? false,
+  // Only sent when set: guests' share API and databases without 0013 don't know it.
+  ...(b.hide_upcoming ? { hide_upcoming: true } : {}),
 })
 
 const patchToRow = (patch) => {
@@ -113,7 +116,7 @@ export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
       .catch((err) => {
         rollback?.()
         const msg = err.message ?? 'Something went wrong'
-        errorRef.current?.(/repeat|recurrence|bookable|all_day|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
+        errorRef.current?.(/repeat|recurrence|bookable|all_day|hide_upcoming|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
       })
       .finally(() => ids.forEach(release))
   }, [])
@@ -184,6 +187,17 @@ export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
       cancelled = true
     }
   }, [backend, rangeStart, rangeEnd, tick, commit, upsertLocal])
+
+  /** Load an extra date range into the store (the dashboard's "Coming up"). Owner only: guests' polls replace the store. */
+  const loadRange = useCallback(
+    async (from, to) => {
+      if (backend.pollMs) return
+      const res = await backend.loadBlocks(from, to)
+      if (res.error) return errorRef.current?.(res.error.message)
+      upsertLocal(res.data)
+    },
+    [backend, upsertLocal],
+  )
 
   // ── Realtime: changes from the MCP server, shared editors, bookings, other tabs ──
   useEffect(() => {
@@ -578,10 +592,12 @@ export function useVapor(backend, { rangeStart, rangeEnd, onError }) {
   const categoriesById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
   return {
+    kind: backend.kind,
     blocks,
     categories,
     categoriesById,
     loading,
+    loadRange,
     createBlock,
     updateBlock,
     moveBlock,

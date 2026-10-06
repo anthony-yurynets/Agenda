@@ -12,6 +12,7 @@ import { useToasts } from './useToasts'
 import { PAGES } from '../pages'
 import CalendarPage from '../pages/CalendarPage'
 import TestingPage from '../pages/TestingPage'
+import DashboardPage from '../pages/DashboardPage'
 // Heavy (body-map SVGs): loaded when the tab is first opened.
 const FitnessPage = lazy(() => import('../pages/FitnessPage'))
 const CompetitionsPage = lazy(() => import('../pages/CompetitionsPage'))
@@ -64,7 +65,8 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   }, [embed, guest])
   const limited = Boolean(guest || embed)
   const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
-  const [pagePref, setPage] = useState(() => readPref('page', 'calendar'))
+  // Owners always land on the Dashboard; guests and the widget on their first page.
+  const [pagePref, setPage] = useState('dashboard')
   const page = allowed.includes(pagePref) ? pagePref : (pages[0]?.id ?? null)
   const canCalendar = pages.some((p) => p.id === 'calendar')
   const [calViewPref, setCalView] = useState(() => readPref('view', 'calendar'))
@@ -100,9 +102,6 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   const store = useVapor(backend, { rangeStart, rangeEnd, onError: (m) => toast(m, 'error') })
   const { categories } = store
 
-  useEffect(() => {
-    if (!limited) writePref('page', pagePref)
-  }, [limited, pagePref])
   useEffect(() => writePref('view', calView), [calView])
   useEffect(() => writePref('hiddenCats', [...hiddenCats]), [hiddenCats])
   useEffect(
@@ -143,6 +142,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   if (page === 'integrations') content = <Integrations toast={toast} />
   else if (page === 'sharing') content = <Sharing toast={toast} />
   else if (page === 'testing') content = <TestingPage />
+  else if (page === 'dashboard') content = <DashboardPage session={session} store={store} toast={toast} />
   else if (page === 'fitness') {
     content = (
       <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
