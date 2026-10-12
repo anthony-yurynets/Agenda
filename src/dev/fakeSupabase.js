@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the parts of supabase-js the app uses.
-const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [], competition_groups: [], assignments: [], assignment_subjects: [], dashboard_links: [] }
+const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [], competition_groups: [], assignments: [], assignment_subjects: [], dashboard_links: [], amc_prep: [], amc_mocks: [], amc_errors: [] }
 let clock = 0
 const stamp = () => new Date(Date.UTC(2026, 0, 1) + ++clock).toISOString()
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Bot, ExternalLink, Plus, Trash2, X } from 'lucide-react'
+import { Bot, ExternalLink, Plus, Sigma, Trash2, X } from 'lucide-react'
 import { CATEGORIES, addDays, daysBetween, fmtDate, isDate, normalizeUrl, prestigeTier, stages as sortStages } from '../../lib/competitions'
 import { DecisionPicker, OptionManager } from './CompBits'
 
@@ -86,7 +86,7 @@ function TimelineEditor({ timeline, today, onChange }) {
 }
 
 /** Edit one competition. */
-export default function CompetitionPanel({ comp: c, store, today, onClose, toast }) {
+export default function CompetitionPanel({ comp: c, store, today, onClose, toast, onOpenPrep }) {
   const update = (patch, opts) => store.updateCompetition(c.id, patch, opts)
   const tier = prestigeTier(c.prestige)
   const href = normalizeUrl(c.url)
@@ -134,6 +134,11 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
           aria-label="Competition name"
           onChange={(e) => update({ name: e.target.value }, { debounce: 400 })}
         />
+        {onOpenPrep && (
+          <button className="btn ghost sm comp-prep-link" onClick={onOpenPrep}>
+            <Sigma size={14} /> Open AMC prep page
+          </button>
+        )}
 
         <span className="field-label">Are we doing this?</span>
         <DecisionPicker comp={c} store={store} onChange={(answer) => store.setDecision(c.id, answer)} />

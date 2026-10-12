@@ -105,6 +105,7 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
     comp({ project_id: proj('Solar drone'), group_ids: grp('Summer 2027'), name: 'Conrad Challenge', url: 'conradchallenge.org', category: 'innovation', prestige: 6, description: 'Team innovation challenge: aerospace, energy, health, and more.', submission_items: by('Slide deck', 'Prototype', 'Demo video'), source: 'ai', timeline: [{ label: 'Stage 1 · Idea', date: day(-1) }, { label: 'Stage 2 · Business plan', date: day(9) }, { label: 'Stage 3 · Pitch', date: day(29) }] }),
     comp({ name: 'FIRST Robotics Competition', url: 'firstinspires.org', category: 'engineering', prestige: 7, submission_items: by('Prototype'), timeline: [{ label: 'Kickoff', date: day(95) }, { label: 'Regionals', date: day(150) }, { label: 'Championship', date: day(200) }] }),
     comp({ name: 'Google Code-in Hackathon', category: 'software', prestige: 4, submission_items: by('Source code', 'Demo video'), timeline: [{ label: 'Hacking', date: day(-60), end: day(-58) }, { label: 'Judging', date: day(-50) }] }),
+    comp({ name: 'AMC 10', url: 'https://maa.org/student-programs/amc/', category: 'other', prestige: 8, description: 'AMC 10 → AIME.', timeline: [{ label: 'Registration', date: '2026-09-15' }, { label: 'AMC 10A', date: '2026-11-10' }, { label: 'AIME', date: '2027-02-04' }] }),
     comp({ decision: 'no', name: 'Local essay contest', category: 'other', prestige: 2, submission_items: by('Essay') }),
   )
 }

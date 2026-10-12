@@ -1,4 +1,4 @@
-import { CalendarDays, Dumbbell, FlaskConical, ListTodo, Trophy } from 'lucide-react'
+import { CalendarDays, Dumbbell, FlaskConical, ListTodo, Sigma, Trophy } from 'lucide-react'
 
 /**
  * Top-level pages, shown as tabs in the top bar (in this order). To add a page:
@@ -11,6 +11,7 @@ export const PAGES = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, shareable: true },
   { id: 'fitness', label: 'Fitness', icon: Dumbbell, shareable: false },
   { id: 'competitions', label: 'Competitions', icon: Trophy, shareable: false },
+  { id: 'amc', label: 'AMC Prep', icon: Sigma, shareable: false },
   { id: 'testing', label: 'Testing', icon: FlaskConical, shareable: false },
 ]
 

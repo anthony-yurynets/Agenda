@@ -3,7 +3,7 @@
 A life manager, starting with a time-block calendar: nested blocks, Google sign-in, a Supabase backend, and an MCP
 server so AI assistants can plan alongside you.
 
-- **Pages:** tabs across the top (Agenda — where the app opens, Calendar, Fitness, Competitions, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
+- **Pages:** tabs across the top (Agenda — where the app opens, Calendar, Fitness, Competitions, AMC Prep, Testing — a blank scratch page). Alt+1…9 jumps between them. Add a page
   in [`src/pages/index.js`](src/pages/index.js) and render it in `Workspace`.
 
 - **Blocks** have a title, date, time range, category and status. Status sets the card color; the side bar shows the category color.
@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0013_dashboard.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0014_amc_prep.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -120,6 +120,23 @@ Your AI can manage it over MCP: `list_competitions` (with the same search), `get
 `manage_submission_options`, `list_projects`, `manage_projects` (set the answer with the `doing` field), `list_groups`,
 `manage_groups` (put competitions in groups with the `groups` field; filter `list_competitions` by `group`). Try: *"Find 5 prestigious research competitions for high schoolers and add them with
 their deadlines."*
+
+## AMC Prep
+
+AMC 10 → AIME prep for Oct 12 – Nov 10, 2026, linked to your AMC entry in the competition tracker (picked
+automatically if one competition's name contains "AMC"; the competition's panel links back). A countdown to the
+test (date editable), an editable target score, and the latest mock with its change from the one before.
+
+- **Daily blocks:** **Add to calendar** creates the evening schedule as daily repeating blocks (Oct 12 – Nov 10) in an
+  *AMC prep* category. Each day's *Topic review* occurrence is titled with that day's topic from the plan; breaks and
+  dinner have no status and stay out of "Coming up". **Remove** deletes the series.
+- **30-day plan** with a done box per day; today's row is highlighted.
+- **Mock scores:** score = 6 × correct + 1.5 × blank (wrong fills itself in), charted against the target.
+- **Error log:** test, problem, topic, reason, key idea, redone. Filter by topic or reason; counts flag the weakest
+  area; unredone problems form the redo queue.
+- **Topic checklist:** four collapsible groups with percent complete.
+
+The plan, schedule and checklist live in [`src/lib/amc.js`](src/lib/amc.js).
 
 ## Sharing
 

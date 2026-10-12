@@ -16,6 +16,7 @@ import AgendaPage from '../pages/AgendaPage'
 // Heavy (body-map SVGs): loaded when the tab is first opened.
 const FitnessPage = lazy(() => import('../pages/FitnessPage'))
 const CompetitionsPage = lazy(() => import('../pages/CompetitionsPage'))
+const AmcPrepPage = lazy(() => import('../pages/AmcPrepPage'))
 
 // Settings screens reached from the sidebar (not tabs).
 const SETTINGS_PAGES = ['sharing', 'integrations']
@@ -133,9 +134,16 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
       return next
     })
 
+  // A competition to open when the Competitions page mounts (from AMC Prep).
+  const [focusComp, setFocusComp] = useState(null)
   const goTo = (id) => {
     setPage(id)
     setNavOpen(false)
+    setFocusComp(null)
+  }
+  const openCompetition = (id) => {
+    goTo('competitions')
+    setFocusComp(id)
   }
 
   let content
@@ -153,7 +161,14 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   else if (page === 'competitions') {
     content = (
       <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
-        <CompetitionsPage session={session} toast={toast} />
+        <CompetitionsPage session={session} toast={toast} focusId={focusComp} onOpenPrep={() => goTo('amc')} />
+      </Suspense>
+    )
+  }
+  else if (page === 'amc') {
+    content = (
+      <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
+        <AmcPrepPage session={session} store={store} toast={toast} onOpenCompetition={openCompetition} />
       </Suspense>
     )
   }

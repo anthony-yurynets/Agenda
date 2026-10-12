@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Plus, Search, Trophy, X } from 'lucide-react'
 import { useCompetitions } from '../state/useCompetitions'
+import { supabase } from '../lib/supabase'
 import { localToday } from '../state/useFitness'
 import {
   CATEGORIES,
@@ -98,7 +99,7 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
 }
 
 /** Competition tracker: instant search over a frosted table, editing in a side panel. */
-export default function CompetitionsPage({ session, toast }) {
+export default function CompetitionsPage({ session, toast, focusId = null, onOpenPrep }) {
   const store = useCompetitions(session.user.id, { onError: (m) => toast(m, 'error') })
   const { optionsById, projectsById, groupsById } = store
   const today = localToday()
@@ -120,7 +121,16 @@ export default function CompetitionsPage({ session, toast }) {
     return u
   }, [store.competitions])
   const [newGroup, setNewGroup] = useState(null)
-  const [openId, setOpenId] = useState(null)
+  const [openId, setOpenId] = useState(focusId)
+  // The competition the AMC Prep page is linked to, to link back to it.
+  const [prepCompId, setPrepCompId] = useState(null)
+  useEffect(() => {
+    supabase
+      .from('amc_prep')
+      .select('competition_id')
+      .maybeSingle()
+      .then(({ data }) => setPrepCompId(data?.competition_id ?? null))
+  }, [])
   const [itemsOpen, setItemsOpen] = useState(false)
   const [listTab, setListTab] = useState('items')
   const searchRef = useRef(null)
@@ -473,7 +483,7 @@ export default function CompetitionsPage({ session, toast }) {
         </section>
       </div>
 
-      {open && <CompetitionPanel key={open.id} comp={open} store={store} today={today} onClose={() => setOpenId(null)} toast={toast} />}
+      {open && <CompetitionPanel key={open.id} comp={open} store={store} today={today} onClose={() => setOpenId(null)} toast={toast} onOpenPrep={open.id === prepCompId ? onOpenPrep : null} />}
     </div>
   )
 }
