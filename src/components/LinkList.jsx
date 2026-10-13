@@ -16,7 +16,7 @@ export default function LinkList({ links, loading, onCopy, onRevoke, empty, acti
           <li key={l.id} className={used || expired ? 'is-spent' : ''}>
             <div>
               <strong>
-                <Link2 size={13} /> {l.name || { edit: 'Edit link', booking: 'Booking link', group: 'View link' }[l.kind]}
+                <Link2 size={13} /> {l.name || { edit: 'Edit link', booking: 'Booking link', group: l.access === 'edit' ? 'Edit link' : 'View link' }[l.kind]}
               </strong>
               <small className="muted">
                 {l.kind === 'booking' && (

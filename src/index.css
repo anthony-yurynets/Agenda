@@ -1708,3 +1708,26 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
   .el-table td.el-idea { grid-column: 1 / -1; }
   .el-table td.el-del { position: absolute; top: 6px; right: 6px; }
 }
+
+/* Competition links (Sharing → Competitions, and a group's Share button) */
+.comp-link-form { margin: 12px 0 14px; }
+.comp-link-form .field-label { margin-top: 0; }
+.comp-link-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.comp-link-row input { flex: 1; min-width: 160px; height: 30px; }
+.comp-link-row .btn { flex-shrink: 0; }
+.access-picker button { gap: 5px; }
+.access-picker.compact button { height: 22px; padding: 0 8px; font-size: 12px; }
+.group-picker.compact .chip { height: 24px; padding: 0 8px; font-size: 12px; }
+.comp-link-extra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
+.comp-links.compact .comp-link-row input { min-width: 0; flex-basis: 100%; order: -1; }
+.comp-links.compact .comp-link-row .btn { margin-left: auto; }
+.comp-links.compact .token-list { max-height: 260px; overflow-y: auto; }
+.shared-group > .comps { height: 100%; }
+/* Inside the Share dropdown, undo the generic full-width menu buttons. */
+.group-share { width: 420px; }
+.group-share .chips .chip { width: auto; height: 27px; padding: 0 10px; border-radius: 8px; }
+.group-share .group-picker.compact .chip { height: 24px; padding: 0 8px; }
+.group-share .segmented button { width: auto; height: 26px; padding: 0 11px; border-radius: 7px; white-space: nowrap; gap: 5px; }
+.group-share .access-picker.compact button { height: 22px; padding: 0 8px; }
+.group-share .comp-link-row .btn { width: auto; height: 28px; padding: 0 10px; justify-content: center; }
+@media (max-width: 520px) { .group-share { width: min(420px, calc(100vw - 32px)); } }

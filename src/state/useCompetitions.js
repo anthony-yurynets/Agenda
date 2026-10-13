@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
 
-const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql through 0012_competition_groups.sql in the Supabase SQL editor to enable Competitions.'
-const TABLE = { comps: 'competitions', options: 'competition_options', projects: 'competition_projects', groups: 'competition_groups' }
+const MIGRATION_HINT = 'Run supabase/migrations/0010_competitions.sql through 0015_competition_links.sql in the Supabase SQL editor to enable Competitions.'
 
 /**
- * Competitions and their lists (submission items, projects, groups) for the signed-in owner. Writes
- * are optimistic and go through a serial queue; realtime keeps AI edits live.
+ * Competitions and their lists (submission items, projects, groups). `backend`
+ * decides where they live: the signed-in owner's tables, or /api/group for a
+ * guest with an edit link (see lib/compBackends). Writes are optimistic and go
+ * through a serial queue; realtime (owner) or polling (guest) keeps it live.
  */
-export function useCompetitions(userId, { onError } = {}) {
+export function useCompetitions(backend, { onError } = {}) {
   const [data, setData] = useState({ comps: {}, options: {}, projects: {}, groups: {} })
   const [loading, setLoading] = useState(true)
+  // Guests: who shared it, and whether the link can edit.
+  const [info, setInfo] = useState(null)
   const ref = useRef(data)
   const errorRef = useRef(onError)
   useEffect(() => {
@@ -52,24 +54,41 @@ export function useCompetitions(userId, { onError } = {}) {
       .finally(() => ids.forEach(release))
   }, [])
 
-  // ── Load ──
+  // ── Load (guests reload on a timer: a fresh snapshot is how they learn about others' changes) ──
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!backend.pollMs) return
+    const bump = () => document.visibilityState === 'visible' && setTick((t) => t + 1)
+    const timer = setInterval(bump, backend.pollMs)
+    window.addEventListener('focus', bump)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', bump)
+    }
+  }, [backend])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [c, o, p, g] = await Promise.all(Object.values(TABLE).map((t) => supabase.from(t).select('*')))
+      const res = await backend.load()
       if (cancelled) return
       setLoading(false)
-      const error = c.error ?? o.error ?? p.error ?? g.error
-      if (error) return report(error)
+      if (res.error) return report(res.error)
+      if (res.info) setInfo(res.info)
       const byId = (rows) => Object.fromEntries(rows.map((r) => [r.id, r]))
-      commit(() => ({ comps: byId(c.data), options: byId(o.data), projects: byId(p.data), groups: byId(g.data) }))
+      commit((prev) => {
+        const next = { comps: byId(res.data.comps), options: byId(res.data.options), projects: byId(res.data.projects), groups: byId(res.data.groups) }
+        // Keep rows with local edits still in flight.
+        for (const id of pending.current.keys()) for (const key of Object.keys(next)) if (prev[key][id]) next[key][id] = prev[key][id]
+        return next
+      })
     })()
     return () => {
       cancelled = true
     }
-  }, [userId, commit])
+  }, [backend, tick, commit])
 
-  // ── Realtime ──
+  // ── Realtime (owner only) ──
   useEffect(() => {
     const apply = (key) => (p) => {
       const id = p.new?.id ?? p.old?.id
@@ -82,17 +101,8 @@ export function useCompetitions(userId, { onError } = {}) {
         return { ...prev, [key]: map }
       })
     }
-    const channel = supabase.channel(`competitions-${userId}`)
-    for (const [key, table] of Object.entries(TABLE)) {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` }, apply(key))
-      // Deletes aren't filterable by column.
-      channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table }, apply(key))
-    }
-    channel.subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [userId, commit])
+    return backend.subscribe(apply)
+  }, [backend, commit])
 
   // ── Generic helpers ──
   const insert = useCallback(
@@ -100,7 +110,7 @@ export function useCompetitions(userId, { onError } = {}) {
       commit((prev) => ({ ...prev, [key]: { ...prev[key], [row.id]: row } }))
       enqueue(
         [row.id],
-        () => supabase.from(TABLE[key]).insert({ ...row, user_id: userId }),
+        () => backend.insert(key, row),
         () =>
           commit((prev) => {
             const map = { ...prev[key] }
@@ -110,14 +120,14 @@ export function useCompetitions(userId, { onError } = {}) {
       )
       return row.id
     },
-    [commit, enqueue, userId],
+    [backend, commit, enqueue],
   )
 
   const update = useCallback(
     (key, id, patch, { debounce = 0 } = {}) => {
       if (!ref.current[key][id]) return
       commit((prev) => ({ ...prev, [key]: { ...prev[key], [id]: { ...prev[key][id], ...patch } } }))
-      const send = (p) => enqueue([id], () => supabase.from(TABLE[key]).update(p).eq('id', id))
+      const send = (p) => enqueue([id], () => backend.update(key, id, p))
       const t = timers.current.get(id)
       if (!debounce) {
         // Fold any pending debounced patch in, so an older value can't land last.
@@ -140,7 +150,7 @@ export function useCompetitions(userId, { onError } = {}) {
         }, debounce),
       })
     },
-    [commit, enqueue],
+    [backend, commit, enqueue],
   )
 
   const remove = useCallback(
@@ -168,9 +178,9 @@ export function useCompetitions(userId, { onError } = {}) {
         }
         return next
       })
-      enqueue([id], () => supabase.from(TABLE[key]).delete().eq('id', id), () => commit(() => snapshot))
+      enqueue([id], () => backend.remove(key, id), () => commit(() => snapshot))
     },
-    [commit, enqueue],
+    [backend, commit, enqueue],
   )
 
   // ── Actions ──
@@ -219,8 +229,18 @@ export function useCompetitions(userId, { onError } = {}) {
   const projects = useMemo(() => sorted(data.projects), [data.projects])
   const groups = useMemo(() => sorted(data.groups), [data.groups])
 
+  // Guests can add to the lists but not rename or delete; groups are the owner's to manage.
+  const guest = backend.kind !== 'owner'
+  const named = (key) => ({
+    items: { options, projects, groups }[key],
+    ...(key === 'groups' && guest ? {} : { create: (name) => createNamed(key, name) }),
+    ...(guest ? {} : { rename: (id, name) => update(key, id, { name: name.slice(0, 80) }, { debounce: 400 }), remove: (id) => remove(key, id) }),
+  })
+
   return {
     loading,
+    guest,
+    info,
     competitions,
     options,
     optionsById: data.options,
@@ -229,27 +249,12 @@ export function useCompetitions(userId, { onError } = {}) {
     deleteCompetition: (id) => remove('comps', id),
     setDecision,
     // Named lists share one shape: { items, create, rename, remove }.
-    optionList: {
-      items: options,
-      create: (name) => createNamed('options', name),
-      rename: (id, name) => update('options', id, { name: name.slice(0, 80) }, { debounce: 400 }),
-      remove: (id) => remove('options', id),
-    },
+    optionList: named('options'),
     projects,
     projectsById: data.projects,
-    projectList: {
-      items: projects,
-      create: (name) => createNamed('projects', name),
-      rename: (id, name) => update('projects', id, { name: name.slice(0, 80) }, { debounce: 400 }),
-      remove: (id) => remove('projects', id),
-    },
+    projectList: named('projects'),
     groups,
     groupsById: data.groups,
-    groupList: {
-      items: groups,
-      create: (name) => createNamed('groups', name),
-      rename: (id, name) => update('groups', id, { name: name.slice(0, 80) }, { debounce: 400 }),
-      remove: (id) => remove('groups', id),
-    },
+    groupList: named('groups'),
   }
 }

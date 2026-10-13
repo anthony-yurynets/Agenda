@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0014_amc_prep.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0015_competition_links.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.
@@ -108,8 +108,16 @@ undecided). Filter by answer or project, sort by *Doing*, and search matches pro
 **Groups** collect competitions into named lists (a competition can be in several). Pick a group in the bar above
 the filters to scope the table to it (new competitions you add there join it), create one with **+ Group**, and
 add or remove a competition from groups in its side panel. Manage the list under **Lists → Groups** (deleting a group
-keeps its competitions). A selected group's **Share** button creates view-only links (`/g/<token>`): anyone with one
-sees that group's competitions, search and details without signing in, kept up to date, and can't edit anything.
+keeps its competitions). A selected group's **Share** button (or **Sharing → Competitions**) creates links (`/g/<token>`)
+that open one or more groups you pick, without signing in:
+
+- **Can view:** the competitions in those groups, with search and details, kept up to date. Nothing can be changed.
+- **Can edit:** the full Competitions page for those groups. Guests can add, change and remove competitions there and
+  add submission items or projects. They can't rename or delete your lists, make groups, share, or see anything
+  outside the link's groups. Deleting a competition that's also in a group they can't see only takes it out of the
+  shared groups. Their changes reach you live; they see yours within a few seconds.
+
+Change a link's access or groups any time (an open page switches over on its next refresh); turn it off to revoke it.
 
 Submission items come from your own option list (**Lists → Submission items**, or *Edit list* in a competition):
 add, rename or delete options; deleting one removes it from every competition. Timeline stages take a date or a
@@ -150,8 +158,8 @@ Open **Sharing** in the sidebar.
   (in a block's details; works with repeating blocks too). A booking becomes a sub-block of that block. Other blocks
   at the same time count as busy. Times show in the visitor's own time zone.
 
-- **Competition group links** (`/g/<token>`): view-only, created from a group's **Share** button on the
-  Competitions page; they're listed here too.
+- **Competition links** (`/g/<token>`): pick the groups a link opens and whether it can view or edit them (see
+  Competitions). Create them here or from a group's **Share** button.
 
 Guests never access the database directly: `api/share.js`, `api/book.js` and `api/group.js` check the token and act on your behalf
 with the service-role key.
@@ -181,4 +189,4 @@ Zoom stays anchored where your fingers are; double-click the time-zone corner to
 
 `npm run dev`, then open http://localhost:5173/preview.html. It runs the real app against an in-memory
 backend with sample data (dev server only; it's not part of the production build). Add `?as=guest` to see the
-edit-link view, `?as=booker` for the booking page, or `?as=viewer` for a shared competition group.
+edit-link view, `?as=booker` for the booking page, or `?as=viewer` / `?as=editor` for a view / edit competition link.

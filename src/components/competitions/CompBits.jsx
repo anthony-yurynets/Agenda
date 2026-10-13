@@ -88,7 +88,8 @@ export function TimelineTrack({ tl, today }) {
 /**
  * A user-editable named list (submission items, projects): toggle chips (when
  * `selected` is given), and an edit mode to add, rename and delete entries.
- * `list` is { items, create, rename, remove } from useCompetitions.
+ * `list` is { items, create, rename, remove } from useCompetitions; without
+ * create there's no add box, and without rename/remove no edit mode (guests).
  */
 export function OptionManager({ list, selected, onToggle, usage, startEditing = false, placeholder = 'New item (e.g. Demo video)', noun = 'options' }) {
   const [editing, setEditing] = useState(startEditing)
@@ -142,17 +143,23 @@ export function OptionManager({ list, selected, onToggle, usage, startEditing = 
           {!list.items.length && <span className="muted small">No {noun} yet. Add one below.</span>}
         </div>
       )}
+      {(list.create || list.rename) && (
       <form className="opt-add" onSubmit={add}>
-        <input placeholder={placeholder} value={draft} maxLength={80} onChange={(e) => setDraft(e.target.value)} aria-label={placeholder} />
-        <button className="btn ghost sm" disabled={!draft.trim()}>
-          <Plus size={13} /> Add
-        </button>
-        {onToggle && (
+        {list.create && (
+          <>
+            <input placeholder={placeholder} value={draft} maxLength={80} onChange={(e) => setDraft(e.target.value)} aria-label={placeholder} />
+            <button className="btn ghost sm" disabled={!draft.trim()}>
+              <Plus size={13} /> Add
+            </button>
+          </>
+        )}
+        {onToggle && list.rename && (
           <button type="button" className={`btn ghost sm ${editing ? 'is-active' : ''}`} onClick={() => setEditing((e) => !e)} aria-pressed={editing}>
             {editing ? <Check size={13} /> : <Pencil size={13} />} {editing ? 'Done' : 'Edit list'}
           </button>
         )}
       </form>
+      )}
     </div>
   )
 }

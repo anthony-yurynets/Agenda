@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CalendarClock, FolderOpen, Plus, Users } from 'lucide-react'
+import { CalendarClock, Plus, Trophy, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { format } from '../lib/dates'
 import { generateToken, linkUrl } from '../lib/shareLinks'
 import LinkList from './LinkList'
 import { SHAREABLE_PAGES } from '../pages'
+import CompetitionLinks from './competitions/CompetitionLinks'
 const SLOT_OPTIONS = [15, 20, 30, 45, 60, 90, 120]
 const MIGRATION_HINT = 'Run supabase/migrations/0004_sharing.sql in the Supabase SQL editor to enable sharing.'
 
@@ -14,7 +15,7 @@ export default function Sharing({ toast }) {
   const [editTools, setEditTools] = useState(() => SHAREABLE_PAGES.map((p) => p.id))
   const [booking, setBooking] = useState({ name: '', slot: 30, uses: 1, expires: '' })
   const [busy, setBusy] = useState(false)
-  const [groups, setGroups] = useState({})
+  const [groups, setGroups] = useState([])
 
   useEffect(() => {
     supabase
@@ -27,11 +28,12 @@ export default function Sharing({ toast }) {
           setLinks([])
         } else setLinks(data)
       })
-    // Names for competition-group links (shared from the Competitions page).
+    // Competition groups that links can open.
     supabase
       .from('competition_groups')
-      .select('id, name')
-      .then(({ data }) => setGroups(Object.fromEntries((data ?? []).map((g) => [g.id, g.name]))))
+      .select('id, name, position')
+      .order('position')
+      .then(({ data }) => setGroups(data ?? []))
   }, [toast])
 
   const create = async (row) => {
@@ -84,7 +86,6 @@ export default function Sharing({ toast }) {
 
   const editLinks = (links ?? []).filter((l) => l.kind === 'edit')
   const bookingLinks = (links ?? []).filter((l) => l.kind === 'booking')
-  const groupLinks = (links ?? []).filter((l) => l.kind === 'group')
 
   return (
     <div className="integrations sharing">
@@ -186,24 +187,16 @@ export default function Sharing({ toast }) {
         <LinkList links={bookingLinks} loading={!links} onCopy={copy} onRevoke={revoke} empty="No booking links yet." />
       </section>
 
-      {groupLinks.length > 0 && (
-        <section className="panel">
-          <h3>
-            <FolderOpen size={17} /> Competition groups
-          </h3>
-          <p className="muted small">
-            View-only links to a group of competitions. Create them from a group’s <strong>Share</strong> button on the Competitions page.
-          </p>
-          <LinkList
-            links={groupLinks}
-            loading={!links}
-            onCopy={copy}
-            onRevoke={revoke}
-            empty=""
-            renderExtra={(l) => <small className="muted">Group: {groups[l.group_id] ?? '…'}</small>}
-          />
-        </section>
-      )}
+      <section className="panel">
+        <h3>
+          <Trophy size={17} /> Competitions
+        </h3>
+        <p className="muted small">
+          Share competition groups with a link, no sign-in. Pick the groups it opens and whether it <strong>can view</strong> or{' '}
+          <strong>can edit</strong> (add, change and remove competitions in those groups). Change either any time; turn a link off to revoke it.
+        </p>
+        <CompetitionLinks groups={groups} toast={toast} />
+      </section>
     </div>
   )
 }

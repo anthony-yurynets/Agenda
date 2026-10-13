@@ -1,7 +1,8 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Plus, Search, Trophy, X } from 'lucide-react'
+import { CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Pencil, Plus, Search, Trophy, X } from 'lucide-react'
 import { useCompetitions } from '../state/useCompetitions'
 import { supabase } from '../lib/supabase'
+import { ownerCompBackend } from '../lib/compBackends'
 import { localToday } from '../state/useFitness'
 import {
   CATEGORIES,
@@ -98,9 +99,16 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
   )
 }
 
-/** Competition tracker: instant search over a frosted table, editing in a side panel. */
-export default function CompetitionsPage({ session, toast, focusId = null, onOpenPrep }) {
-  const store = useCompetitions(session.user.id, { onError: (m) => toast(m, 'error') })
+/**
+ * Competition tracker: instant search over a frosted table, editing in a side panel.
+ * A guest with an edit link passes `backend` (lib/compBackends) and sees only the
+ * link's groups, without list management, group creation or sharing.
+ */
+export default function CompetitionsPage({ session, toast, focusId = null, onOpenPrep, backend: backendProp }) {
+  const userId = session?.user.id
+  const backend = useMemo(() => backendProp ?? ownerCompBackend(userId), [backendProp, userId])
+  const store = useCompetitions(backend, { onError: (m) => toast(m, 'error') })
+  const guest = store.guest
   const { optionsById, projectsById, groupsById } = store
   const today = localToday()
 
@@ -125,12 +133,13 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
   // The competition the AMC Prep page is linked to, to link back to it.
   const [prepCompId, setPrepCompId] = useState(null)
   useEffect(() => {
+    if (backendProp) return
     supabase
       .from('amc_prep')
       .select('competition_id')
       .maybeSingle()
       .then(({ data }) => setPrepCompId(data?.competition_id ?? null))
-  }, [])
+  }, [backendProp])
   const [itemsOpen, setItemsOpen] = useState(false)
   const [listTab, setListTab] = useState('items')
   const searchRef = useRef(null)
@@ -244,8 +253,10 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
 
   const toggleCat = (id) => setF({ categories: filters.categories.includes(id) ? filters.categories.filter((x) => x !== id) : [...filters.categories, id] })
   const clearAll = () => (setQuery(''), setFilters(EMPTY_FILTERS))
+  // A guest's new competition has to land in one of the shared groups.
+  const addGroup = groupId ?? (guest ? store.groups[0]?.id : null)
   const add = () =>
-    setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other', group_ids: groupId ? [groupId] : [] }))
+    setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other', group_ids: addGroup ? [addGroup] : [] }))
   const createGroup = (e) => {
     e.preventDefault()
     const id = store.groupList.create(newGroup ?? '')
@@ -260,9 +271,10 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
           <div className="comps-title">
             <Trophy size={20} />
             <div>
-              <h2>{group ? group.name : 'Competitions'}</h2>
+              <h2>{group ? group.name : guest ? 'Shared competitions' : 'Competitions'}</h2>
               <p className="muted small">
-                {competitions.length} {group ? 'in this group' : 'tracked'}
+                {guest && `${store.info?.owner ? `Shared by ${store.info.owner}` : 'Shared with you'} · `}
+                {competitions.length} {group ? 'in this group' : guest ? 'shared' : 'tracked'}
                 {upNext.length > 0 && ` · next date ${countdownLabel(daysBetween(today, upNext[0].s.date)).toLowerCase()}`}
               </p>
             </div>
@@ -291,6 +303,12 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
             )}
           </label>
           <div className="comps-actions">
+            {guest && (
+              <span className="view-only muted small">
+                <Pencil size={13} /> Can edit
+              </span>
+            )}
+            {!guest && (
             <div className="dropdown" ref={itemsRef}>
               <button className={`btn ghost ${itemsOpen ? 'is-active' : ''}`} onClick={() => setItemsOpen((o) => !o)} aria-expanded={itemsOpen}>
                 <ListChecks size={15} /> Lists
@@ -318,6 +336,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
                 </div>
               )}
             </div>
+            )}
             <button className="btn primary" onClick={add}>
               <Plus size={15} /> Add
             </button>
@@ -327,14 +346,14 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
         <nav className="comp-groups" aria-label="Groups">
           <FolderOpen size={15} className="muted" aria-hidden="true" />
           <div className="chips" role="tablist">
-            {[{ id: null, name: 'All' }, ...store.groups].map((g) => (
+            {[{ id: null, name: guest ? 'All shared' : 'All' }, ...store.groups].map((g) => (
               <button key={g.id ?? 'all'} role="tab" aria-selected={groupId === g.id} className={`chip group-chip ${groupId === g.id ? 'on' : ''}`} onClick={() => setGroup(g.id)}>
                 {g.name}
                 <span className="chip-count">{g.id ? (groupCounts[g.id] ?? 0) : store.competitions.length}</span>
               </button>
             ))}
           </div>
-          {newGroup === null ? (
+          {guest ? null : newGroup === null ? (
             <button className="btn ghost sm" onClick={() => setNewGroup('')}>
               <Plus size={13} /> Group
             </button>
@@ -356,7 +375,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
             </form>
           )}
           <span className="flex1" />
-          {group && <GroupShare key={group.id} group={group} toast={toast} />}
+          {group && !guest && <GroupShare key={group.id} group={group} groups={store.groups} toast={toast} />}
         </nav>
 
         <div className="comps-filters">

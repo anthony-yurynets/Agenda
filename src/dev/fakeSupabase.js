@@ -29,6 +29,7 @@ class Query {
   lte(col, val) { this.filters.push((r) => r[col] != null && r[col] <= val); return this }
   eq(col, val) { this.filters.push((r) => r[col] === val); return this }
   in(col, vals) { this.filters.push((r) => vals.includes(r[col])); return this }
+  overlaps(col, vals) { this.filters.push((r) => vals.some((v) => (r[col] ?? []).includes(v))); return this }
   contains(col, vals) { this.filters.push((r) => vals.every((v) => (r[col] ?? []).includes(v))); return this }
   not(col) { this.filters.push((r) => r[col] !== null && r[col] !== undefined); return this }
   or(expr) {
@@ -48,7 +49,7 @@ class Query {
       const defaults = this.table === 'blocks'
         ? { parent_id: null, notes: '', status: 'planned', source: 'user', repeat: null, repeat_exdates: [], recurrence_id: null, recurrence_date: null, category_id: null, bookable: false, all_day: false }
         : this.table === 'share_links'
-          ? { uses: 0, created_at: new Date().toISOString(), expires_at: null, revoked_at: null }
+          ? { uses: 0, created_at: new Date().toISOString(), expires_at: null, revoked_at: null, group_ids: [], access: 'view' }
           : {}
       const rows = this.rows.map((r) => ({ id: crypto.randomUUID(), created_at: stamp(), ...defaults, ...r }))
       t.push(...rows)
@@ -73,7 +74,8 @@ class Query {
       if (this.table === 'competition_projects') for (const c of tables.competitions) if (doomed.has(c.project_id)) c.project_id = null
       if (this.table === 'competition_groups') {
         for (const c of tables.competitions) c.group_ids = (c.group_ids ?? []).filter((x) => !doomed.has(x))
-        tables.share_links = tables.share_links.filter((l) => !doomed.has(l.group_id))
+        for (const l of tables.share_links) if (l.group_ids) l.group_ids = l.group_ids.filter((x) => !doomed.has(x))
+        tables.share_links = tables.share_links.filter((l) => l.kind !== 'group' || l.group_ids?.length)
       }
       if (this.table === 'assignment_subjects') for (const a of tables.assignments) if (doomed.has(a.subject_id)) a.subject_id = null
       if (this.table === 'competition_options') for (const c of tables.competitions) c.submission_items = (c.submission_items ?? []).filter((x) => !doomed.has(x))

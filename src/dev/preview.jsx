@@ -42,6 +42,7 @@ fakeSupabase.tables.blocks.push(
 const EDIT_TOKEN = 'preview-edit-token-0000000000000'
 const BOOK_TOKEN = 'preview-book-token-0000000000000'
 const GROUP_TOKEN = 'preview-group-token-000000000000'
+const GROUP_EDIT_TOKEN = 'preview-group-edit-token-0000000'
 fakeSupabase.tables.share_links.push(
   { id: 'l1', user_id: 'u1', kind: 'edit', token: EDIT_TOKEN, name: 'Sam', created_at: new Date().toISOString() },
   { id: 'l2', user_id: 'u1', kind: 'booking', token: BOOK_TOKEN, name: 'Intro call', slot_minutes: 30, max_uses: 3, uses: 0,
@@ -97,7 +98,8 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   const G = ['Summer 2027', 'Team picks'].map(opt)
   T.competition_groups.push(...G)
   const grp = (...names) => names.map((n) => G.find((x) => x.name === n).id)
-  T.share_links.push({ id: 'l3', user_id: 'u1', kind: 'group', group_id: G[0].id, token: GROUP_TOKEN, name: 'Coach', created_at: new Date().toISOString() })
+  T.share_links.push({ id: 'l3', user_id: 'u1', kind: 'group', group_ids: [G[0].id], access: 'view', token: GROUP_TOKEN, name: 'Coach', created_at: new Date().toISOString() },
+    { id: 'l4', user_id: 'u1', kind: 'group', group_ids: [G[0].id, G[1].id], access: 'edit', token: GROUP_EDIT_TOKEN, name: 'Teammate', created_at: new Date().toISOString() })
   T.competitions.push(
     comp({ project_id: proj('Microplastics study'), group_ids: grp('Summer 2027', 'Team picks'), name: 'Regeneron International Science and Engineering Fair', url: 'https://www.societyforscience.org/isef/', category: 'research', prestige: 10, description: 'The world’s largest pre-college STEM competition. Qualify through an affiliated regional fair.', submission_items: by('Research paper', 'Poster', 'Abstract'), timeline: [{ label: 'Regional fair', date: day(-20) }, { label: 'State fair', date: day(12) }, { label: 'ISEF finals', date: day(60), end: day(65) }] }),
     comp({ project_id: proj('Study buddy app'), name: 'Congressional App Challenge', url: 'congressionalappchallenge.us', category: 'software', prestige: 7, description: 'Build an app; judged by your district’s member of Congress.', submission_items: by('Demo video', 'Source code'), timeline: [{ label: 'Registration', date: day(-30) }, { label: 'Submission deadline', date: day(3) }, { label: 'Winners announced', date: day(45) }] }),
@@ -160,12 +162,13 @@ const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { d
   import('../index.css'),
   import('../lib/theme'),
 ])
-// ?as=guest → edit-link view, ?as=booker → booking page, ?as=viewer → shared group, default → owner.
+// ?as=guest → edit-link view, ?as=booker → booking page, ?as=viewer / ?as=editor → shared competitions (view / edit), default → owner.
 const as = new URLSearchParams(location.search).get('as')
 const session = { user: { id: 'u1', email: 'you@example.com', user_metadata: { full_name: 'Preview User' } } }
 createRoot(document.getElementById('root')).render(
   as === 'guest' ? <SharedWorkspace token={EDIT_TOKEN} />
     : as === 'booker' ? <BookingPage token={BOOK_TOKEN} />
       : as === 'viewer' ? <SharedGroupPage token={GROUP_TOKEN} />
-        : <Workspace session={session} />,
+        : as === 'editor' ? <SharedGroupPage token={GROUP_EDIT_TOKEN} />
+          : <Workspace session={session} />,
 )
