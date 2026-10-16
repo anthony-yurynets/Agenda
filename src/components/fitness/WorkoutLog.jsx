@@ -1,5 +1,5 @@
-import { Bot, Check, Plus } from 'lucide-react'
-import { MUSCLE_BY_ID, muscleLabel, trained, workoutStats } from '../../lib/fitness'
+import { Bot, Check, HeartPulse, Plus } from 'lucide-react'
+import { MUSCLE_BY_ID, distanceUnit, isCardio, muscleLabel, trained, workoutStats } from '../../lib/fitness'
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const dateParts = (iso) => {
@@ -33,6 +33,7 @@ function Card({ w, today, selected, onOpen, unit }) {
   const st = workoutStats(w)
   const state = stateOf(w, today)
   const shown = st.muscles.slice(0, 4)
+  const hasCardio = w.exercises.some(isCardio)
   return (
     <button className={`wk-card ${state} ${selected ? 'selected' : ''}`} onClick={() => onOpen(w.id)}>
       <div className="wk-date">
@@ -49,17 +50,24 @@ function Card({ w, today, selected, onOpen, unit }) {
           {state === 'skipped' && <span className="wk-tag muted-tag">Skipped</span>}
         </div>
         <div className="wk-muscles">
+          {hasCardio && (
+            <span className="mchip g-cardio">
+              <HeartPulse size={10} /> Cardio
+            </span>
+          )}
           {shown.map((m) => (
             <span key={m} className={`mchip g-${MUSCLE_BY_ID[m]?.group ?? 'core'}`}>
               {muscleLabel(m)}
             </span>
           ))}
           {st.muscles.length > shown.length && <span className="mchip more">+{st.muscles.length - shown.length}</span>}
-          {!st.muscles.length && <span className="muted small">No exercises yet</span>}
+          {!st.muscles.length && !hasCardio && <span className="muted small">No exercises yet</span>}
         </div>
         <div className="wk-stats">
           {w.exercises.length} exercise{w.exercises.length === 1 ? '' : 's'} · {st.done}/{st.sets} sets
           {st.volume > 0 && ` · ${Math.round(st.volume).toLocaleString()} ${unit}`}
+          {st.minutes > 0 && ` · ${Math.round(st.minutes)} min`}
+          {st.distance > 0 && ` · ${+st.distance.toFixed(1)} ${distanceUnit(unit)}`}
         </div>
       </div>
       <Ring value={st.sets ? st.done / st.sets : 0} done={state === 'done'} />

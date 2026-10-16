@@ -82,6 +82,11 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   const ai = crypto.randomUUID()
   T.workouts.push({ id: ai, user_id: 'u1', title: 'Upper hypertrophy', date: day(1), status: 'planned', notes: 'Planned by your AI', source: 'ai', completed_at: null, created_at: new Date().toISOString() })
   T.workout_exercises.push({ id: crypto.randomUUID(), user_id: 'u1', workout_id: ai, name: 'Incline dumbbell press', muscles: ['chest', 'deltoids'], position: 0, notes: '' })
+  const run = crypto.randomUUID()
+  const runEx = crypto.randomUUID()
+  T.workouts.push({ id: run, user_id: 'u1', title: 'Easy run', date: day(-1), status: 'done', notes: '', source: 'user', completed_at: new Date(`${day(-1)}T07:30`).toISOString(), created_at: new Date().toISOString() })
+  T.workout_exercises.push({ id: runEx, user_id: 'u1', workout_id: run, name: 'Run', kind: 'cardio', muscles: [], position: 0, notes: '' })
+  T.workout_sets.push({ id: crypto.randomUUID(), user_id: 'u1', exercise_id: runEx, position: 0, minutes: 32, distance: 3.4, done: true })
 }
 // Competition sample data.
 {

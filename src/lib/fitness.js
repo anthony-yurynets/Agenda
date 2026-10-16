@@ -36,6 +36,10 @@ export const GROUPS = [
   { id: 'core', label: 'Core', hint: 'abs · obliques · lower back' },
 ]
 
+/** Exercise kinds: strength sets log reps × weight, cardio logs minutes and distance. */
+export const isCardio = (ex) => ex.kind === 'cardio'
+export const distanceUnit = (unit) => (unit === 'kg' ? 'km' : 'mi')
+
 export const FRESH_BELOW = 1
 export const LEVELS = [
   { id: 0, label: 'Fresh', min: 0 },
@@ -111,6 +115,7 @@ export function setsPerMuscle(workouts, sinceDate) {
   for (const w of workouts) {
     if (w.date < sinceDate || w.status === 'skipped') continue
     for (const ex of w.exercises ?? []) {
+      if (isCardio(ex)) continue
       const id = ex.muscles?.[0]
       if (id && MUSCLE_BY_ID[id]) out[id] = (out[id] ?? 0) + doneSets(ex).length
     }
@@ -202,16 +207,21 @@ export function workoutStats(w) {
   let sets = 0
   let done = 0
   let volume = 0
+  let minutes = 0
+  let distance = 0
   const muscles = new Set()
   for (const ex of w.exercises ?? []) {
     for (const s of ex.sets ?? []) {
       sets++
       if (s.done) {
         done++
-        volume += (Number(s.weight) || 0) * (s.reps || 0)
+        if (isCardio(ex)) {
+          minutes += Number(s.minutes) || 0
+          distance += Number(s.distance) || 0
+        } else volume += (Number(s.weight) || 0) * (s.reps || 0)
       }
     }
     ;(ex.muscles ?? []).forEach((m) => muscles.add(m))
   }
-  return { sets, done, volume, muscles: [...muscles] }
+  return { sets, done, volume, minutes, distance, muscles: [...muscles] }
 }

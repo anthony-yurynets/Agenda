@@ -13,16 +13,19 @@ import {
   setsPerMuscle,
   personalRecords,
   workoutStats,
+  isCardio,
+  distanceUnit,
 } from '../../src/lib/fitness.js'
 import { isValidDate } from '../../src/lib/domain.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const STATUSES = ['planned', 'done', 'skipped']
+const KINDS = ['strength', 'cardio']
 const must = (cond, msg) => {
   if (!cond) throw new Error(msg)
 }
 const unwrap = ({ data, error }) => {
-  if (error) throw new Error(/relation|schema cache/.test(error.message) ? 'Fitness tables missing: run supabase/migrations/0009_fitness.sql' : error.message)
+  if (error) throw new Error(/relation|schema cache/.test(error.message) ? 'Fitness tables missing: run supabase/migrations/0009_fitness.sql and 0016_cardio.sql' : error.message)
   return data
 }
 
@@ -31,23 +34,30 @@ const setSchema = {
   properties: {
     reps: { type: 'integer', minimum: 0 },
     weight: { type: 'number', minimum: 0, description: "In the user's unit (see get_fitness_summary → settings.unit). Omit for bodyweight." },
+    minutes: { type: 'number', minimum: 0, description: 'Cardio only: duration of this interval in minutes.' },
+    distance: { type: 'number', minimum: 0, description: 'Cardio only: miles if settings.unit is lb, kilometres if kg.' },
     done: { type: 'boolean', description: 'true once performed. Planned sets are false (default).' },
   },
 }
 const musclesProp = {
   type: 'array',
   items: { type: 'string', enum: MUSCLE_IDS },
-  description: 'Muscles worked, main muscle FIRST (it counts fully toward fatigue; the rest count half).',
+  description: 'Muscles worked, main muscle FIRST (it counts fully toward fatigue; the rest count half). Optional for cardio.',
 }
 const exerciseSchema = {
   type: 'object',
   properties: {
-    name: { type: 'string', description: 'e.g. "Bench press"' },
+    name: { type: 'string', description: 'e.g. "Bench press", or "Run" for cardio' },
+    kind: { type: 'string', enum: KINDS, description: 'Default strength (sets of reps × weight). cardio logs minutes and distance instead.' },
     muscles: musclesProp,
     notes: { type: 'string' },
-    sets: { type: 'array', items: setSchema, description: 'One entry per set, e.g. 3 × {reps: 8, weight: 135}.' },
+    sets: {
+      type: 'array',
+      items: setSchema,
+      description: 'One entry per set, e.g. 3 × {reps: 8, weight: 135}. For cardio, one entry per interval, e.g. {minutes: 30, distance: 3}.',
+    },
   },
-  required: ['name', 'muscles'],
+  required: ['name'],
 }
 
 export const FITNESS_TOOLS = [
@@ -84,7 +94,7 @@ export const FITNESS_TOOLS = [
     name: 'create_workout',
     title: 'Create workout',
     description:
-      'Plan (or record) a workout with its exercises and sets. Planned sets have done=false; the user ticks them ' +
+      'Plan (or record) a workout with its exercises and sets — strength and/or cardio (kind "cardio": minutes/distance). Planned sets have done=false; the user ticks them ' +
       'off in the app. Pick exercises that fit the user\'s recovery (get_fitness_summary).',
     inputSchema: {
       type: 'object',
@@ -118,7 +128,7 @@ export const FITNESS_TOOLS = [
     name: 'add_exercise',
     title: 'Add exercise',
     description: 'Add an exercise (with sets) to an existing workout.',
-    inputSchema: { ...exerciseSchema, properties: { workout_id: { type: 'string' }, ...exerciseSchema.properties }, required: ['workout_id', 'name', 'muscles'] },
+    inputSchema: { ...exerciseSchema, properties: { workout_id: { type: 'string' }, ...exerciseSchema.properties }, required: ['workout_id', 'name'] },
   },
   {
     name: 'update_exercise',
@@ -134,7 +144,7 @@ export const FITNESS_TOOLS = [
     name: 'log_sets',
     title: 'Log sets',
     description:
-      'Record or edit sets for an exercise. Entries with an id update that set; entries without one are added. ' +
+      'Record or edit sets for an exercise (intervals of minutes/distance for cardio). Entries with an id update that set; entries without one are added. ' +
       'remove_set_ids deletes sets.',
     inputSchema: {
       type: 'object',
@@ -164,8 +174,9 @@ export const FITNESS_TOOLS = [
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function cleanMuscles(list) {
-  must(Array.isArray(list) && list.length, 'muscles: give at least one muscle')
+function cleanMuscles(list, { optional = false } = {}) {
+  if (optional && (list === undefined || list === null)) return []
+  must(Array.isArray(list) && (optional || list.length), 'muscles: give at least one muscle')
   const bad = list.filter((m) => !MUSCLE_IDS.includes(m))
   must(!bad.length, `Unknown muscle(s): ${bad.join(', ')}. Valid: ${MUSCLE_IDS.join(', ')}`)
   return [...new Set(list)]
@@ -178,6 +189,20 @@ function cleanSet(s) {
   must(weight === null || (weight >= 0 && weight <= 10000), 'weight must be 0–10000')
   return { reps, weight, done: Boolean(s.done) }
 }
+
+function cleanCardioSet(s) {
+  const minutes = s.minutes === undefined || s.minutes === null ? null : Number(s.minutes)
+  const distance = s.distance === undefined || s.distance === null ? null : Number(s.distance)
+  must(minutes === null || (minutes >= 0 && minutes <= 1440), 'minutes must be 0–1440')
+  must(distance === null || (distance >= 0 && distance <= 10000), 'distance must be 0–10000')
+  return { minutes, distance, done: Boolean(s.done) }
+}
+
+const cleanKind = (kind = 'strength') => {
+  must(KINDS.includes(kind), `kind must be one of ${KINDS.join(', ')}`)
+  return kind
+}
+const setCleaner = (kind) => (kind === 'cardio' ? cleanCardioSet : cleanSet)
 
 const localToday = (tz) => {
   try {
@@ -201,6 +226,8 @@ async function loadWorkouts(sb, userId, from, to) {
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
+const num = (v) => (v === null || v === undefined ? null : Number(v))
+
 function shape(w, unit) {
   const st = workoutStats(w)
   return {
@@ -213,11 +240,20 @@ function shape(w, unit) {
     exercises: w.exercises.map((e) => ({
       id: e.id,
       name: e.name,
+      kind: e.kind ?? 'strength',
       muscles: e.muscles,
       notes: e.notes || undefined,
-      sets: e.sets.map((s) => ({ id: s.id, reps: s.reps, weight: s.weight === null ? null : Number(s.weight), done: s.done })),
+      sets: e.sets.map((s) =>
+        isCardio(e)
+          ? { id: s.id, minutes: num(s.minutes), distance: num(s.distance), done: s.done }
+          : { id: s.id, reps: s.reps, weight: num(s.weight), done: s.done },
+      ),
     })),
-    summary: `${st.done}/${st.sets} sets done${st.volume ? ` · ${Math.round(st.volume)} ${unit} volume` : ''}`,
+    summary:
+      `${st.done}/${st.sets} sets done` +
+      (st.volume ? ` · ${Math.round(st.volume)} ${unit} volume` : '') +
+      (st.minutes ? ` · ${Math.round(st.minutes)} min cardio` : '') +
+      (st.distance ? ` · ${+st.distance.toFixed(2)} ${distanceUnit(unit)}` : ''),
   }
 }
 
@@ -242,14 +278,23 @@ async function ownedExercise(sb, userId, id) {
 
 async function insertExercise(sb, userId, workoutId, spec, position) {
   must(typeof spec.name === 'string' && spec.name.trim(), 'Each exercise needs a name')
+  const kind = cleanKind(spec.kind)
   const ex = unwrap(
     await sb
       .from('workout_exercises')
-      .insert({ user_id: userId, workout_id: workoutId, name: spec.name.trim().slice(0, 120), muscles: cleanMuscles(spec.muscles), notes: spec.notes ?? '', position })
+      .insert({
+        user_id: userId,
+        workout_id: workoutId,
+        name: spec.name.trim().slice(0, 120),
+        kind,
+        muscles: cleanMuscles(spec.muscles, { optional: kind === 'cardio' }),
+        notes: spec.notes ?? '',
+        position,
+      })
       .select('*')
       .single(),
   )
-  const sets = (spec.sets ?? []).map((s, i) => ({ user_id: userId, exercise_id: ex.id, position: i, ...cleanSet(s) }))
+  const sets = (spec.sets ?? []).map((s, i) => ({ user_id: userId, exercise_id: ex.id, position: i, ...setCleaner(kind)(s) }))
   if (sets.length) unwrap(await sb.from('workout_sets').insert(sets))
   return ex
 }
@@ -302,8 +347,9 @@ export const fitnessImpl = {
     must(STATUSES.includes(status), `status must be one of ${STATUSES.join(', ')}`)
     // Validate everything before writing anything.
     exercises.forEach((e) => {
-      cleanMuscles(e.muscles)
-      ;(e.sets ?? []).forEach(cleanSet)
+      const kind = cleanKind(e.kind)
+      cleanMuscles(e.muscles, { optional: kind === 'cardio' })
+      ;(e.sets ?? []).forEach(setCleaner(kind))
     })
     const w = unwrap(
       await sb
@@ -345,7 +391,7 @@ export const fitnessImpl = {
     const patch = {}
     if (name !== undefined) patch.name = String(name).slice(0, 120)
     if (notes !== undefined) patch.notes = String(notes)
-    if (muscles !== undefined) patch.muscles = cleanMuscles(muscles)
+    if (muscles !== undefined) patch.muscles = cleanMuscles(muscles, { optional: isCardio(e) })
     unwrap(await sb.from('workout_exercises').update(patch).eq('user_id', userId).eq('id', e.id))
     return fitnessImpl.get_workout(sb, userId, { id: e.workout_id })
   },
@@ -355,16 +401,17 @@ export const fitnessImpl = {
     const existing = unwrap(await sb.from('workout_sets').select('*').eq('user_id', userId).eq('exercise_id', e.id))
     const known = new Set(existing.map((s) => s.id))
     let position = existing.reduce((m, s) => Math.max(m, s.position), -1) + 1
+    const clean = setCleaner(e.kind)
     for (const s of sets) {
       if (s.id) {
         must(known.has(s.id), `Set ${s.id} isn't part of this exercise`)
         const patch = {}
-        if (s.reps !== undefined) patch.reps = cleanSet(s).reps
-        if (s.weight !== undefined) patch.weight = cleanSet(s).weight
+        const c = clean(s)
+        for (const k of ['reps', 'weight', 'minutes', 'distance']) if (s[k] !== undefined && k in c) patch[k] = c[k]
         if (s.done !== undefined) patch.done = Boolean(s.done)
         unwrap(await sb.from('workout_sets').update(patch).eq('user_id', userId).eq('id', s.id))
       } else {
-        unwrap(await sb.from('workout_sets').insert({ user_id: userId, exercise_id: e.id, position: position++, ...cleanSet(s) }))
+        unwrap(await sb.from('workout_sets').insert({ user_id: userId, exercise_id: e.id, position: position++, ...clean(s) }))
       }
     }
     for (const id of remove_set_ids) {

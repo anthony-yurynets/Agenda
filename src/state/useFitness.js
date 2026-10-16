@@ -5,7 +5,7 @@ import { addDays } from '../lib/fitness'
 const HISTORY_DAYS = 180
 const AHEAD_DAYS = 60
 const DEFAULT_SETTINGS = { unit: 'lb', weekly_goal: 4, training_days: ['mon', 'tue', 'wed', 'thu', 'fri'] }
-const MIGRATION_HINT = 'Run supabase/migrations/0009_fitness.sql in the Supabase SQL editor to enable Fitness.'
+const MIGRATION_HINT = 'Run supabase/migrations/0009_fitness.sql and 0016_cardio.sql in the Supabase SQL editor to enable Fitness.'
 
 const localToday = () => {
   const d = new Date()
@@ -43,7 +43,7 @@ export function useFitness(userId, { onError } = {}) {
     if (n <= 0) pending.current.delete(id)
     else pending.current.set(id, n)
   }
-  const report = (err) => errorRef.current?.(/workout|fitness/.test(err?.message ?? '') && /relation|schema|exist/.test(err?.message ?? '') ? MIGRATION_HINT : (err?.message ?? 'Something went wrong'))
+  const report = (err) => errorRef.current?.(/workout|fitness|kind|minutes|distance/.test(err?.message ?? '') && /relation|schema|exist/.test(err?.message ?? '') ? MIGRATION_HINT : (err?.message ?? 'Something went wrong'))
 
   const enqueue = useCallback((ids, fn, rollback) => {
     ids.forEach(hold)
@@ -211,8 +211,11 @@ export function useFitness(userId, { onError } = {}) {
   const addExercise = useCallback(
     (workoutId, fields = {}) => {
       const position = Object.values(ref.current.exercises).filter((e) => e.workout_id === workoutId).length
+      const cardio = fields.kind === 'cardio'
       const id = insert('exercises', { id: crypto.randomUUID(), workout_id: workoutId, name: '', muscles: [], notes: '', position, ...fields })
-      for (let i = 0; i < 3; i++) insert('sets', { id: crypto.randomUUID(), exercise_id: id, position: i, reps: null, weight: null, done: false })
+      // Cardio starts with one interval (minutes, distance); strength with three sets.
+      const blank = cardio ? { minutes: null, distance: null } : { reps: null, weight: null }
+      for (let i = 0; i < (cardio ? 1 : 3); i++) insert('sets', { id: crypto.randomUUID(), exercise_id: id, position: i, ...blank, done: false })
       return id
     },
     [insert],
@@ -224,12 +227,14 @@ export function useFitness(userId, { onError } = {}) {
         .filter((s) => s.exercise_id === exerciseId)
         .sort((a, b) => a.position - b.position)
       const last = sets[sets.length - 1]
+      const cardio = ref.current.exercises[exerciseId]?.kind === 'cardio'
       return insert('sets', {
         id: crypto.randomUUID(),
         exercise_id: exerciseId,
         position: (last?.position ?? -1) + 1,
-        reps: last?.reps ?? null,
-        weight: last?.weight ?? null,
+        ...(cardio
+          ? { minutes: last?.minutes ?? null, distance: last?.distance ?? null }
+          : { reps: last?.reps ?? null, weight: last?.weight ?? null }),
         done: false,
       })
     },
