@@ -39,7 +39,7 @@ function useNow() {
   return now
 }
 
-export default function WeekView({ days, store, blocks, visible, allDay = [], search, selectedId, quickId, onSelect, onCreate, onCreateAllDay, onQuickClose, onQuickExpand }) {
+export default function WeekView({ days, store, blocks, visible, allDay = [], search, selectedId, quickId, onSelect, onCreate, onCreateAllDay, onQuickClose, onQuickExpand, hoverRef }) {
   const { categoriesById, moveBlock } = store
   const scrollRef = useRef(null)
   const colsRef = useRef(null)
@@ -221,6 +221,16 @@ export default function WeekView({ days, store, blocks, visible, allDay = [], se
     return clamp(Math.floor(((clientX - r.left) / r.width) * days.length), 0, days.length - 1)
   }
 
+  // Where the mouse is (day + snapped minute), so a paste lands under it.
+  const trackHover = (e) => {
+    if (!hoverRef || e.pointerType === 'touch') return
+    const minute = clamp(snapDown(minutesAt(e.clientY)), 0, DAY_MINUTES - SNAP)
+    hoverRef.current = { date: dayISO[dayAt(e.clientX)], minute }
+  }
+  const clearHover = () => {
+    if (hoverRef) hoverRef.current = null
+  }
+
   // ── Pointer gestures (create / move / resize) ──
   const endGesture = useCallback(() => {
     window.removeEventListener('pointermove', gesture.current?.onMove)
@@ -388,7 +398,7 @@ export default function WeekView({ days, store, blocks, visible, allDay = [], se
             )}
           </div>
 
-          <div className="cols" ref={colsRef}>
+          <div className="cols" ref={colsRef} onPointerMove={trackHover} onPointerLeave={clearHover}>
             {days.map((d, i) => {
               const list = byDay.get(dayISO[i]) ?? []
               const layout = layoutOverlaps(list)

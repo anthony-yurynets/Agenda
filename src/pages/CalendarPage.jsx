@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, List, Menu, Plus, Search } from 'lucide-react'
 import { nowMinutes, rangeLabel, toISODate } from '../lib/dates'
 import { expandBlocks } from '../lib/recurrence'
@@ -13,6 +13,10 @@ import StatusFilter from '../components/StatusFilter'
  * top bar share them); everything else about the calendar lives here. Keyboard
  * shortcuts are registered only while this page is showing.
  */
+// Copied block tree, kept for the session (survives switching weeks and pages).
+let calendarClipboard = null
+const MOD = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? '⌘' : 'Ctrl+'
+
 export default function CalendarPage({
   store,
   days,
@@ -37,6 +41,7 @@ export default function CalendarPage({
 }) {
   const [selectedRaw, setSelectedId] = useState(null)
   const [quickRaw, setQuickId] = useState(null)
+  const hoverRef = useRef(null) // { date, minute } under the mouse in the week grid
 
   // Series templates expanded into occurrences for the visible range.
   const { display: blocks, aliases } = useMemo(
@@ -95,11 +100,53 @@ export default function CalendarPage({
     createAt(date, start, start + 60)
   }, [createAt, rangeStart, rangeEnd, calView, setCalView])
 
+  const openBlock = (id) => {
+    setQuickId(null)
+    setSelectedId(id)
+  }
+
+  // Copy / paste: Cmd/Ctrl+C copies the selected block (with its sub-blocks);
+  // Cmd/Ctrl+V pastes it on the day under the mouse, starting at the mouse.
+  const copyBlock = () => {
+    const root = blocks[selectedId]
+    if (!root) return false
+    const tree = []
+    const walk = (b) => {
+      tree.push(b)
+      for (const c of Object.values(blocks)) if (c.parent_id === b.id) walk(c)
+    }
+    walk(root)
+    calendarClipboard = tree
+    setSelectedId(null) // clear the grid for pasting
+    toast(`Copied “${root.title || 'Untitled'}” · hover a day and press ${MOD}V to paste`)
+    return true
+  }
+  const pasteBlock = () => {
+    const at = hoverRef.current
+    if (!calendarClipboard) return false
+    if (calView !== 'calendar' || !at) {
+      toast('Hover over a day in the calendar to paste')
+      return true
+    }
+    if (store.pasteTree(calendarClipboard, { date: at.date, start: at.minute })) toast(`Pasted “${calendarClipboard[0].title || 'Untitled'}”`)
+    return true
+  }
+
   // Keyboard shortcuts (ignored while typing).
   useEffect(() => {
     const onKey = (e) => {
       const t = e.target
-      if (t.closest?.('input, textarea, select, [contenteditable="true"]') || e.metaKey || e.ctrlKey || e.altKey) return
+      if (t.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      const mod = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey
+      if (mod && (e.key === 'c' || e.key === 'C') && selectedId && !window.getSelection()?.toString()) {
+        if (copyBlock()) e.preventDefault()
+        return
+      }
+      if (mod && (e.key === 'v' || e.key === 'V')) {
+        if (pasteBlock()) e.preventDefault()
+        return
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault()
         newBlockNow()
@@ -119,11 +166,6 @@ export default function CalendarPage({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
-
-  const openBlock = (id) => {
-    setQuickId(null)
-    setSelectedId(id)
-  }
 
   return (
     <section className="panel calendar-panel">
@@ -211,6 +253,7 @@ export default function CalendarPage({
             onCreateAllDay={(date) => createAt(date, 0, 24 * 60, true)}
             onQuickClose={() => setQuickId(null)}
             onQuickExpand={(id) => openBlock(id)}
+            hoverRef={hoverRef}
             toast={toast}
           />
         ) : (

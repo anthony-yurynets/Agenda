@@ -7,7 +7,10 @@ import {
   toMinutes,
   isOccurrenceId,
   splitOccurrenceId,
+  DAY_MINUTES,
 } from '../lib/domain'
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 // Rows use minutes in the UI; convert at the edges.
 const fromRow = (r) => ({
@@ -547,6 +550,48 @@ export function useCalendar(backend, { rangeStart, rangeEnd, onError }) {
     [createBlock, resolve],
   )
 
+  /**
+   * Paste a copied block tree (root first, as plain blocks) as a new one-off
+   * block on `date`, its root starting at `start` (clamped to fit the day).
+   * All-day roots keep their times. Returns the new root id.
+   */
+  const pasteTree = useCallback(
+    (tree, { date, start }) => {
+      const [root] = tree
+      if (!root) return null
+      const dur = root.end - root.start
+      const shift = root.all_day ? 0 : clamp(start, 0, DAY_MINUTES - dur) - root.start
+      const ids = new Map(tree.map((b) => [b.id, crypto.randomUUID()]))
+      const rows = tree.map((b) => ({
+        id: ids.get(b.id),
+        parent_id: b === root ? null : ids.get(b.parent_id),
+        title: b.title,
+        date,
+        start: b.start + shift,
+        end: b.end + shift,
+        category_id: b.category_id,
+        status: b.status,
+        notes: b.notes,
+        source: 'user',
+        repeat: null,
+        repeat_exdates: [],
+        recurrence_id: null,
+        recurrence_date: null,
+        bookable: b.bookable ?? false,
+        all_day: b === root ? (b.all_day ?? false) : false,
+        hide_upcoming: b.hide_upcoming ?? false,
+      }))
+      commit((prev) => {
+        const next = { ...prev }
+        for (const r of rows) next[r.id] = r
+        return next
+      })
+      insertTree(rows)
+      return rows[0].id
+    },
+    [commit, insertTree],
+  )
+
   // ── Category actions ──
   const createCategory = useCallback(
     (name) => {
@@ -605,6 +650,7 @@ export function useCalendar(backend, { rangeStart, rangeEnd, onError }) {
     setRepeat,
     divideBlock,
     addSubBlock,
+    pasteTree,
     createCategory,
     updateCategory,
     deleteCategory,
