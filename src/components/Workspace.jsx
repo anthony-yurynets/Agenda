@@ -20,6 +20,7 @@ const AmcPrepPage = lazy(() => import('../pages/AmcPrepPage'))
 
 // Settings screens reached from the sidebar (not tabs).
 const SETTINGS_PAGES = ['sharing', 'integrations']
+const PAGE_TITLES = { ...Object.fromEntries(PAGES.map((p) => [p.id, p.label])), sharing: 'Sharing', integrations: 'Integrations' }
 
 const readPref = (key, fallback) => {
   try {
@@ -65,6 +66,8 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
     return PAGES
   }, [embed, guest])
   const limited = Boolean(guest || embed)
+  // The page list (sidebar) only shows when there's somewhere else to go.
+  const navPages = !limited || pages.length > 1 ? pages : null
   const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
   // Owners always land on the Agenda; guests and the widget on their first page.
   const [pagePref, setPage] = useState('agenda')
@@ -211,6 +214,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   return (
     <div className={`app ${navOpen ? 'nav-open' : ''} ${embed ? 'embed' : ''}`}>
       <Sidebar
+        pages={navPages}
         page={page}
         setPage={goTo}
         store={store}
@@ -225,9 +229,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
       <div className="main">
         {!embed && (
           <Topbar
-            pages={!limited || pages.length > 1 ? pages : null}
-            page={page}
-            onPage={goTo}
+            title={PAGE_TITLES[page] ?? 'Calendar'}
             subtitle={guest ? `You're editing ${guest.owner ? `${guest.owner}'s` : 'a shared'} calendar` : null}
             session={session}
             guest={guest}

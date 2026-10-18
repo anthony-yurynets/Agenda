@@ -4,8 +4,10 @@ import { getThemePref, setThemePref } from '../lib/theme'
 import { CATEGORY_PALETTE } from '../lib/domain'
 import Logo from './Logo'
 
-/** Sidebar: tools for the current page (categories on Calendar), then settings and theme. */
-export default function Sidebar({ page, setPage, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest, embed }) {
+const ALT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? '⌥' : 'Alt+'
+
+/** Sidebar: the pages, tools for the current page (categories on Calendar), then settings and theme. */
+export default function Sidebar({ pages, page, setPage, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest, embed }) {
   const { categories, createCategory, updateCategory, deleteCategory } = store
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -38,8 +40,26 @@ export default function Sidebar({ page, setPage, store, hiddenCats, toggleCatego
         </button>
       </div>
 
+      {pages && (
+        <nav className="nav pages-nav" aria-label="Pages">
+          {pages.map(({ id, label, icon: Icon }, i) => (
+            <button
+              key={id}
+              className={`nav-item ${page === id ? 'active' : ''}`}
+              aria-current={page === id ? 'page' : undefined}
+              onClick={() => setPage(id)}
+              title={i < 9 ? `${label} (${ALT}${i + 1})` : label}
+            >
+              <Icon size={17} />
+              <span>{label}</span>
+              {i < 9 && <kbd className="nav-key">{ALT}{i + 1}</kbd>}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {page === 'calendar' && (
-      <div className="side-section first">
+      <div className={`side-section ${pages ? '' : 'first'}`}>
         <div className="side-heading">
           <span>Categories</span>
           <button className="icon-btn sm" onClick={() => setAdding(true)} aria-label="Add category">
