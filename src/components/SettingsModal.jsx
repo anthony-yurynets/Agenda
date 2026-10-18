@@ -6,6 +6,7 @@ const SHIFT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? 'â‡
 
 export default function SettingsModal({ onClose }) {
   const [shiftToCreate, setShiftToCreate] = usePref('shiftToCreate', false)
+  const [blockStyle, setBlockStyle] = usePref('blockStyle', 'clear')
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -34,6 +35,19 @@ export default function SettingsModal({ onClose }) {
           </span>
           <input type="checkbox" className="switch" checked={shiftToCreate} onChange={(e) => setShiftToCreate(e.target.checked)} />
         </label>
+        <div className="toggle-row setting-row">
+          <span>
+            <strong>Block style</strong>
+            <small>{blockStyle === 'solid' ? 'Opaque cards tinted by status.' : 'See-through, tinted by category.'}</small>
+          </span>
+          <div className="segmented small" role="radiogroup" aria-label="Block style">
+            {[['clear', 'Transparent'], ['solid', 'Solid']].map(([id, label]) => (
+              <button key={id} role="radio" aria-checked={blockStyle === id} className={blockStyle === id ? 'on' : ''} onClick={() => setBlockStyle(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

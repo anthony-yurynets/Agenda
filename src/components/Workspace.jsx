@@ -10,6 +10,7 @@ import { emptyBackend, ownerBackend } from '../lib/backends'
 import Toasts from './Toasts'
 import { useToasts } from './useToasts'
 import { PAGES } from '../pages'
+import { usePref } from '../lib/prefs'
 import CalendarPage from '../pages/CalendarPage'
 import TestingPage from '../pages/TestingPage'
 import AgendaPage from '../pages/AgendaPage'
@@ -66,6 +67,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
     return PAGES
   }, [embed, guest])
   const limited = Boolean(guest || embed)
+  const [blockStyle] = usePref('blockStyle', 'clear')
   // The page list (sidebar) only shows when there's somewhere else to go.
   const navPages = !limited || pages.length > 1 ? pages : null
   const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
@@ -212,7 +214,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   }
 
   return (
-    <div className={`app ${navOpen ? 'nav-open' : ''} ${embed ? 'embed' : ''}`}>
+    <div className={`app ${navOpen ? 'nav-open' : ''} ${embed ? 'embed' : ''} ${blockStyle === 'solid' ? 'blocks-solid' : ''}`}>
       <Sidebar
         pages={navPages}
         page={page}

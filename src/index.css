@@ -277,6 +277,7 @@ input:disabled { color: var(--muted); }
 .modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .modal .menu-label { padding: 6px 0 0; }
 .modal .toggle-row { margin-top: 8px; }
+.setting-row { cursor: default; }
 @keyframes pop { from { opacity: 0; transform: translateY(-3px) scale(0.985); } }
 
 .content { flex: 1; min-height: 0; overflow: auto; border-radius: var(--radius); }
@@ -398,6 +399,27 @@ input:disabled { color: var(--muted); }
 .block.nested .block-region { margin-top: 3px; }
 .block.nested.tiny .block-body { padding: 1px 5px; }
 .block.nested.tiny .block-title { font-size: 10.5px; line-height: 13px; height: 13px; }
+
+/* Solid block style (Settings → Block style): opaque cards tinted by status. */
+.blocks-solid .block {
+  border-radius: 9px; --cat-ink: var(--ink);
+  background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 20%, transparent);
+}
+.blocks-solid .block .block-time { color: var(--ink-2); }
+.blocks-solid .block.top:hover { background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 38%, transparent), var(--shadow); }
+.blocks-solid .block.selected,
+.blocks-solid .block.top.selected:hover { background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid); box-shadow: inset 0 0 0 1.5px var(--st), 0 0 0 3px color-mix(in srgb, var(--st) 22%, transparent); }
+.blocks-solid .block.selected > .block-body > .block-time { color: var(--ink-2); }
+.blocks-solid .block.selected > .block-body > .block-time .status-fg { color: var(--st); }
+.blocks-solid .block.selected > .block-body > .block-time .ai-mark { color: var(--muted); }
+.blocks-solid .block .block-bar, .blocks-solid .block.selected > .block-bar { background: var(--cat); border-radius: 3px; margin: 5px 0 5px 5px; }
+.blocks-solid .block.tiny .block-bar { margin: 3px 0 3px 3px; }
+.blocks-solid .block.nested { border-radius: 6px; }
+.blocks-solid .block.nested .block-bar { margin: 3px 0 3px 3px; }
+.blocks-solid .block.nested:hover { background: linear-gradient(var(--st-bg), var(--st-bg)), var(--glass-solid); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--st) 50%, transparent); }
+.blocks-solid .block.dragging { box-shadow: var(--shadow-pop); }
+.blocks-solid .block.top.bookable { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--st) 45%, transparent); }
 
 .block-segments { position: relative; height: 4px; margin-top: auto; border-radius: 2px; background: var(--fill-hover); overflow: hidden; flex-shrink: 0; }
 .seg { position: absolute; top: 0; bottom: 0; background: var(--st); box-shadow: 1px 0 0 var(--glass-solid); }
