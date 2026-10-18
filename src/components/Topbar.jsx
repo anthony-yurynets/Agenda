@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LogOut, Menu, Search, Users } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Search, Settings, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import SettingsModal from './SettingsModal'
 
 export default function Topbar({ title, subtitle, session, guest, search, setSearch, showSearch, onMenu }) {
   const user = session?.user
   const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email
   const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
   const [open, setOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const menuRef = useRef(null)
   const searchRef = useRef(null)
 
@@ -71,6 +73,9 @@ export default function Topbar({ title, subtitle, session, guest, search, setSea
         </button>
         {open && (
           <div className="menu">
+            <button onClick={() => (setOpen(false), setSettingsOpen(true))}>
+              <Settings size={15} /> Settings
+            </button>
             <button onClick={() => supabase.auth.signOut()}>
               <LogOut size={15} /> Sign out
             </button>
@@ -78,6 +83,7 @@ export default function Topbar({ title, subtitle, session, guest, search, setSea
         )}
       </div>
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </header>
   )
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { DAY_MINUTES, fromMinutes } from '../lib/domain'
 import { format, isSameDay, nowMinutes, toISODate } from '../lib/dates'
 import { buildChildrenMap, layoutOverlaps } from '../lib/tree'
+import { usePref } from '../lib/prefs'
 import BlockCard from './BlockCard'
 import QuickCreate from './QuickCreate'
 import StatusIcon from './StatusIcon'
@@ -45,6 +46,7 @@ export default function WeekView({ days, store, blocks, visible, allDay = [], se
   const colsRef = useRef(null)
   const gesture = useRef(null)
   const [draft, setDraft] = useState(null) // creation drag {day, start, end}
+  const [shiftToCreate] = usePref('shiftToCreate', false) // mouse: only Shift+click/drag adds blocks
   const [preview, setPreview] = useState(null) // move/resize {id, date, start, end}
   const headRef = useRef(null)
   const [ppm, setPpm] = useState(readZoom)
@@ -261,6 +263,7 @@ export default function WeekView({ days, store, blocks, visible, allDay = [], se
   const startCreate = (e, dayIndex) => {
     if (e.button !== 0 || e.target.closest('.block, .quick')) return
     if (quickId) return // outside-click closes the quick editor instead
+    if (shiftToCreate && e.pointerType === 'mouse' && !e.shiftKey) return
     e.preventDefault()
     const anchor = clamp(snapDown(minutesAt(e.clientY)), 0, DAY_MINUTES - SNAP)
     const y0 = e.clientY
