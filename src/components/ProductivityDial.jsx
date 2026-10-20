@@ -31,8 +31,10 @@ function useNow() {
 export default function ProductivityDial({ store }) {
   const [ratings, setRatings] = usePref('ratings', {})
   const now = useNow()
-  const [open, setOpen] = useState(false)
+  // The day's list stays pinned in the corner until closed (remembered).
+  const [open, setOpen] = usePref('ratingsOpen', true)
   const [dismissed, setDismissed] = useState(null)
+  const [editing, setEditing] = useState(null)
 
   // Today's timed, trackable top-level blocks that have already ended.
   const ended = useMemo(() => {
@@ -65,8 +67,14 @@ export default function ProductivityDial({ store }) {
     setRatings({ ...kept, [block.id]: { score, date: block.date, title: block.title, end: block.end } })
   }
 
+  const rerate = (id, score) => {
+    setRatings({ ...ratings, [id]: { ...ratings[id], score } })
+    setEditing(null)
+  }
+
   const close = () => {
     setOpen(false)
+    setEditing(null)
     setDismissed(pending?.id ?? null)
   }
 
@@ -94,11 +102,7 @@ export default function ProductivityDial({ store }) {
                 </small>
               </div>
               <div className="prod-scores">
-                {SCORES.map((s) => (
-                  <button key={s} onClick={() => rate(pending, s)} style={{ '--sc': scoreColor(s) }}>
-                    {s}
-                  </button>
-                ))}
+                <Scores onPick={(s) => rate(pending, s)} />
               </div>
               <button className="prod-skip" onClick={() => rate(pending, null)}>
                 Skip
@@ -107,9 +111,21 @@ export default function ProductivityDial({ store }) {
           ) : rated.length ? (
             <ul className="prod-list">
               {rated.map(([id, r]) => (
-                <li key={id}>
-                  <span>{r.title || 'Untitled'}</span>
-                  <b style={{ color: scoreColor(r.score) }}>{r.score}</b>
+                <li key={id} className={editing === id ? 'editing' : ''}>
+                  <button
+                    className="prod-row"
+                    onClick={() => setEditing(editing === id ? null : id)}
+                    aria-expanded={editing === id}
+                    title="Change rating"
+                  >
+                    <span>{r.title || 'Untitled'}</span>
+                    <b style={{ color: scoreColor(r.score) }}>{r.score}</b>
+                  </button>
+                  {editing === id && (
+                    <div className="prod-scores">
+                      <Scores current={r.score} onPick={(s) => rerate(id, s)} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -143,4 +159,12 @@ export default function ProductivityDial({ store }) {
       </button>
     </div>
   )
+}
+
+function Scores({ current, onPick }) {
+  return SCORES.map((s) => (
+    <button key={s} className={s === current ? 'on' : ''} onClick={() => onPick(s)} style={{ '--sc': scoreColor(s) }}>
+      {s}
+    </button>
+  ))
 }
