@@ -26,7 +26,8 @@ function BlockCard({ block, height, depth = 0, ctx, style, onPointerDown, onResi
   const regionH = height - headerH - m.gap - 5
   const nest = kids.length > 0 && regionH >= 22
   const showPill = depth === 0 && kids.length === 0 && height >= 104 && hasStatus(block.status)
-  const span = Math.max(block.end - block.start, 1)
+  const showNote = showTime && kids.length === 0 && Boolean(block.notes?.trim())
+  const span =Math.max(block.end - block.start, 1)
 
   const classes = [
     'block',
@@ -65,6 +66,7 @@ function BlockCard({ block, height, depth = 0, ctx, style, onPointerDown, onResi
           </div>
         )}
         <div className={`block-title ${nest || !showTime ? 'one-line' : ''}`}>{block.title || 'Untitled'}</div>
+        {showNote && <div className="block-note">{block.notes.trim()}</div>}
 
         {nest && (
           <div className="block-region" style={{ height: regionH }}>

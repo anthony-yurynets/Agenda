@@ -385,6 +385,13 @@ input:disabled { color: var(--muted); }
 .block-title.one-line { white-space: nowrap; text-overflow: ellipsis; height: 17px; flex-shrink: 0; }
 .block:not(.has-kids) .block-title:not(.one-line) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .s-canceled .block-title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--st) 60%, transparent); color: var(--ink-2); }
+/* Notes give way first when the block is short, so the title keeps its lines. */
+.block-note {
+  flex: 0 1000 auto; min-height: 0; margin-top: 2px; overflow: hidden;
+  font-size: 11.5px; line-height: 15px; color: color-mix(in srgb, var(--cat-ink) 72%, transparent);
+  white-space: pre-line; word-break: break-word;
+}
+.block.nested .block-note { font-size: 10.5px; line-height: 13px; margin-top: 1px; }
 .block.tiny .block-body { padding: 2px 6px; justify-content: center; }
 .block.tiny .block-title { font-size: 11.5px; line-height: 14px; height: 14px; }
 
