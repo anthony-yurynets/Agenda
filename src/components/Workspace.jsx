@@ -8,6 +8,7 @@ import Integrations from './Integrations'
 import Sharing from './Sharing'
 import { emptyBackend, ownerBackend } from '../lib/backends'
 import Toasts from './Toasts'
+import ProductivityDial from './ProductivityDial'
 import { useToasts } from './useToasts'
 import { PAGES } from '../pages'
 import { usePref } from '../lib/prefs'
@@ -68,6 +69,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
   }, [embed, guest])
   const limited = Boolean(guest || embed)
   const [blockStyle] = usePref('blockStyle', 'clear')
+  const [rateProductivity] = usePref('rateProductivity', false)
   // The page list (sidebar) only shows when there's somewhere else to go.
   const navPages = !limited || pages.length > 1 ? pages : null
   const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
@@ -244,6 +246,7 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
         <div className="content">{content}</div>
       </div>
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+      {rateProductivity && !limited && <ProductivityDial store={store} />}
       <Toasts toasts={toasts} dismiss={dismiss} />
     </div>
   )

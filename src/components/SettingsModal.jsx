@@ -7,6 +7,7 @@ const SHIFT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? 'â‡
 export default function SettingsModal({ onClose }) {
   const [shiftToCreate, setShiftToCreate] = usePref('shiftToCreate', false)
   const [blockStyle, setBlockStyle] = usePref('blockStyle', 'clear')
+  const [rateProductivity, setRateProductivity] = usePref('rateProductivity', false)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -48,6 +49,18 @@ export default function SettingsModal({ onClose }) {
             ))}
           </div>
         </div>
+        <div className="menu-label">Productivity</div>
+        <label className="toggle-row">
+          <span>
+            <strong>Rate productivity</strong>
+            <small>
+              {rateProductivity
+                ? 'When a block ends, rate it out of 10. The dial in the corner shows todayâ€™s average.'
+                : 'Rate each block out of 10 when it ends and see a daily average dial.'}
+            </small>
+          </span>
+          <input type="checkbox" className="switch" checked={rateProductivity} onChange={(e) => setRateProductivity(e.target.checked)} />
+        </label>
       </div>
     </div>
   )
