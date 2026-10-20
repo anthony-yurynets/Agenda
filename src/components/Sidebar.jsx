@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Check, Eye, EyeOff, Monitor, Moon, Pencil, Plug, Plus, Share2, Sun, Trash2, X } from 'lucide-react'
-import { getThemePref, setThemePref } from '../lib/theme'
+import { Check, Eye, EyeOff, Pencil, Plug, Plus, Share2, Trash2, X } from 'lucide-react'
 import { CATEGORY_PALETTE } from '../lib/domain'
 import Logo from './Logo'
+import ThemeSwitch from './ThemeSwitch'
 
 const ALT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? '⌥' : 'Alt+'
 
-/** Sidebar: the pages, tools for the current page (categories on Calendar), then settings and theme. */
+/** Sidebar: the pages, tools for the current page (categories on Calendar), then settings (and the theme, for guests). */
 export default function Sidebar({ pages, page, setPage, store, hiddenCats, toggleCategory, activeCategory, setActiveCategory, onClose, guest, embed }) {
   const { categories, createCategory, updateCategory, deleteCategory } = store
   const [adding, setAdding] = useState(false)
@@ -141,36 +141,9 @@ export default function Sidebar({ pages, page, setPage, store, hiddenCats, toggl
         </nav>
       )}
 
-      <ThemeSwitch />
+      {/* Owners pick the theme in Settings; guests and the widget can't open it. */}
+      {(guest || embed) && <ThemeSwitch />}
     </aside>
-  )
-}
-
-function ThemeSwitch() {
-  const [pref, setPref] = useState(getThemePref)
-  const options = [
-    { id: 'light', label: 'Light', icon: Sun },
-    { id: 'dark', label: 'Dark', icon: Moon },
-    { id: 'system', label: 'System', icon: Monitor },
-  ]
-  return (
-    <div className="theme-switch" role="radiogroup" aria-label="Theme">
-      {options.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          role="radio"
-          aria-checked={pref === id}
-          className={pref === id ? 'on' : ''}
-          onClick={() => {
-            setThemePref(id)
-            setPref(id)
-          }}
-        >
-          <Icon size={14} />
-          {label}
-        </button>
-      ))}
-    </div>
   )
 }
 

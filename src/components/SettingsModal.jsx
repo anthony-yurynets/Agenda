@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { usePref } from '../lib/prefs'
+import ThemeSwitch from './ThemeSwitch'
 
 const SHIFT = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? '') ? '⇧' : 'Shift'
 
@@ -23,6 +24,14 @@ export default function SettingsModal({ onClose }) {
           <button className="icon-btn sm" onClick={onClose} aria-label="Close settings">
             <X size={16} />
           </button>
+        </div>
+        <div className="menu-label">Appearance</div>
+        <div className="toggle-row setting-row">
+          <span>
+            <strong>Theme</strong>
+            <small>System follows your device’s light or dark mode.</small>
+          </span>
+          <ThemeSwitch className="segmented small" />
         </div>
         <div className="menu-label">Calendar</div>
         <label className="toggle-row">
