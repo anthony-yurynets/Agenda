@@ -30,6 +30,7 @@ export function expandBlocks(blocks, from, to) {
       date,
       parent_id: parentId,
       repeat: null,
+      productivity_rating: null, // rated per occurrence, once it's a real row
       virtual: true,
       seriesId,
       templateId: src.id,

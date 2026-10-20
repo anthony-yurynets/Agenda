@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { expandBlocks } from '../lib/recurrence'
 import { fromMinutes } from '../lib/domain'
-import { addDays, nowMinutes, toISODate, todayISO } from '../lib/dates'
+import { isOccurrenceId, splitOccurrenceId } from '../lib/domain'
+import { nowMinutes, todayISO } from '../lib/dates'
 import { usePref } from '../lib/prefs'
 
-const KEEP_DAYS = 60
+const LEGACY_KEY = 'agenda:ratings'
 const SCORES = Array.from({ length: 10 }, (_, i) => i + 1)
 
 // Gauge geometry: a 270° arc opening at the bottom.
@@ -26,15 +27,16 @@ function useNow() {
 /**
  * Productivity ratings (Settings → Rate productivity): when a timed block
  * ends, ask for a 1–10 score; the corner dial shows today's average.
- * Ratings live in localStorage, keyed by block id (occurrence ids for repeats).
+ * Scores are saved on the block (productivity_rating: 1–10, 0 = skipped).
+ * Rating a repeating occurrence turns it into its own row.
  */
 export default function ProductivityDial({ store }) {
-  const [ratings, setRatings] = usePref('ratings', {})
   const now = useNow()
   // The day's list stays pinned in the corner until closed (remembered).
   const [open, setOpen] = usePref('ratingsOpen', true)
   const [dismissed, setDismissed] = useState(null)
   const [editing, setEditing] = useState(null)
+  useImportLocalRatings(store)
 
   // Today's timed, trackable top-level blocks that have already ended.
   const ended = useMemo(() => {
@@ -53,22 +55,18 @@ export default function ProductivityDial({ store }) {
       .sort((a, b) => b.end - a.end)
   }, [store.blocks, now])
 
-  const unrated = ended.filter((b) => !(b.id in ratings))
+  const unrated = ended.filter((b) => b.productivity_rating == null)
   const pending = unrated[0] ?? null
   // Pop the prompt open whenever a new block needs rating.
   const showPrompt = pending && (open || dismissed !== pending.id)
 
-  const today = Object.values(ratings).filter((r) => r.date === now.date && r.score != null)
-  const avg = today.length ? today.reduce((s, r) => s + r.score, 0) / today.length : null
+  const rated = ended.filter((b) => b.productivity_rating > 0)
+  const avg = rated.length ? rated.reduce((s, b) => s + b.productivity_rating, 0) / rated.length : null
 
-  const rate = (block, score) => {
-    const cutoff = toISODate(addDays(new Date(), -KEEP_DAYS))
-    const kept = Object.fromEntries(Object.entries(ratings).filter(([, r]) => r.date >= cutoff))
-    setRatings({ ...kept, [block.id]: { score, date: block.date, title: block.title, end: block.end } })
-  }
+  const rate = (id, score) => store.updateBlock(id, { productivity_rating: score })
 
   const rerate = (id, score) => {
-    setRatings({ ...ratings, [id]: { ...ratings[id], score } })
+    rate(id, score)
     setEditing(null)
   }
 
@@ -77,10 +75,6 @@ export default function ProductivityDial({ store }) {
     setEditing(null)
     setDismissed(pending?.id ?? null)
   }
-
-  const rated = Object.entries(ratings)
-    .filter(([, r]) => r.date === now.date && r.score != null)
-    .sort(([, a], [, b]) => (b.end ?? 0) - (a.end ?? 0))
 
   return (
     <div className="prod">
@@ -102,28 +96,28 @@ export default function ProductivityDial({ store }) {
                 </small>
               </div>
               <div className="prod-scores">
-                <Scores onPick={(s) => rate(pending, s)} />
+                <Scores onPick={(s) => rate(pending.id, s)} />
               </div>
-              <button className="prod-skip" onClick={() => rate(pending, null)}>
+              <button className="prod-skip" onClick={() => rate(pending.id, 0)}>
                 Skip
               </button>
             </>
           ) : rated.length ? (
             <ul className="prod-list">
-              {rated.map(([id, r]) => (
-                <li key={id} className={editing === id ? 'editing' : ''}>
+              {rated.map((b) => (
+                <li key={b.id} className={editing === b.id ? 'editing' : ''}>
                   <button
                     className="prod-row"
-                    onClick={() => setEditing(editing === id ? null : id)}
-                    aria-expanded={editing === id}
+                    onClick={() => setEditing(editing === b.id ? null : b.id)}
+                    aria-expanded={editing === b.id}
                     title="Change rating"
                   >
-                    <span>{r.title || 'Untitled'}</span>
-                    <b style={{ color: scoreColor(r.score) }}>{r.score}</b>
+                    <span>{b.title || 'Untitled'}</span>
+                    <b style={{ color: scoreColor(b.productivity_rating) }}>{b.productivity_rating}</b>
                   </button>
-                  {editing === id && (
+                  {editing === b.id && (
                     <div className="prod-scores">
-                      <Scores current={r.score} onPick={(s) => rerate(id, s)} />
+                      <Scores current={b.productivity_rating} onPick={(s) => rerate(b.id, s)} />
                     </div>
                   )}
                 </li>
@@ -138,7 +132,7 @@ export default function ProductivityDial({ store }) {
         className="prod-dial"
         onClick={() => (showPrompt || open ? close() : setOpen(true))}
         aria-label={avg == null ? 'Productivity: no ratings today' : `Productivity today: ${avg.toFixed(1)} out of 10`}
-        title={avg == null ? 'No ratings today' : `${today.length} rated today`}
+        title={avg == null ? 'No ratings today' : `${rated.length} rated today`}
       >
         <svg viewBox="0 0 56 56" width="56" height="56">
           <circle className="prod-track" cx="28" cy="28" r={R} strokeDasharray={`${ARC} 999`} transform="rotate(135 28 28)" />
@@ -159,6 +153,35 @@ export default function ProductivityDial({ store }) {
       </button>
     </div>
   )
+}
+
+/**
+ * Ratings used to live in localStorage; move any for loaded blocks onto the
+ * blocks themselves once, then drop the old key.
+ */
+function useImportLocalRatings(store) {
+  const done = useRef(false)
+  useEffect(() => {
+    if (done.current || store.loading) return
+    done.current = true
+    let legacy
+    try {
+      legacy = JSON.parse(localStorage.getItem(LEGACY_KEY))
+    } catch {
+      return
+    }
+    if (!legacy) return
+    for (const [id, r] of Object.entries(legacy)) {
+      const own = store.blocks[isOccurrenceId(id) ? splitOccurrenceId(id).templateId : id]
+      if (!own || (!isOccurrenceId(id) && own.productivity_rating != null)) continue
+      store.updateBlock(id, { productivity_rating: r.score ?? 0 })
+    }
+    try {
+      localStorage.removeItem(LEGACY_KEY)
+    } catch {
+      /* storage unavailable */
+    }
+  }, [store])
 }
 
 function Scores({ current, onPick }) {

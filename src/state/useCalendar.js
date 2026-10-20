@@ -31,6 +31,7 @@ const fromRow = (r) => ({
   bookable: r.bookable ?? false,
   all_day: r.all_day ?? false,
   hide_upcoming: r.hide_upcoming ?? false,
+  productivity_rating: r.productivity_rating ?? null,
 })
 
 const toRow = (b, userId) => ({
@@ -53,6 +54,7 @@ const toRow = (b, userId) => ({
   all_day: b.all_day ?? false,
   // Only sent when set: guests' share API and databases without 0013 don't know it.
   ...(b.hide_upcoming ? { hide_upcoming: true } : {}),
+  ...(b.productivity_rating != null ? { productivity_rating: b.productivity_rating } : {}),
 })
 
 const patchToRow = (patch) => {
@@ -119,7 +121,7 @@ export function useCalendar(backend, { rangeStart, rangeEnd, onError }) {
       .catch((err) => {
         rollback?.()
         const msg = err.message ?? 'Something went wrong'
-        errorRef.current?.(/repeat|recurrence|bookable|all_day|hide_upcoming|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
+        errorRef.current?.(/repeat|recurrence|bookable|all_day|hide_upcoming|productivity_rating|source_check|status_check/.test(msg) ? MIGRATION_HINT : msg)
       })
       .finally(() => ids.forEach(release))
   }, [])
@@ -287,6 +289,7 @@ export function useCalendar(backend, { rangeStart, rangeEnd, onError }) {
           repeat_exdates: [],
           recurrence_id: src.id,
           recurrence_date: date,
+          productivity_rating: null,
         }
         created.push(row)
         for (const c of childrenOf(all, src.id)) copy(c, row.id)

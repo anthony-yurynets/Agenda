@@ -38,6 +38,8 @@ fakeSupabase.tables.blocks.push(
   row({ title: '1:1 with Sam', date: d(1), start_time: '10:30', end_time: '11:30', category_id: 'c1', status: 'canceled' }),
   row({ title: 'Read · chapter 4', date: d(2), start_time: '13:00', end_time: '14:00', category_id: 'c3', source: 'ai' }),
   row({ title: 'Deep work', date: d(4), start_time: '08:00', end_time: '11:00', source: 'ai' }),
+  // Already rated, for the productivity dial.
+  row({ title: 'Morning reading', date: format(new Date(), 'yyyy-MM-dd'), start_time: '06:30', end_time: '07:30', category_id: 'c3', status: 'done', productivity_rating: 7 }),
 )
 const EDIT_TOKEN = 'preview-edit-token-0000000000000'
 const BOOK_TOKEN = 'preview-book-token-0000000000000'
