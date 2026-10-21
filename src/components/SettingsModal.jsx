@@ -9,6 +9,7 @@ export default function SettingsModal({ onClose }) {
   const [shiftToCreate, setShiftToCreate] = usePref('shiftToCreate', false)
   const [blockStyle, setBlockStyle] = usePref('blockStyle', 'clear')
   const [rateProductivity, setRateProductivity] = usePref('rateProductivity', false)
+  const [showAgenda, setShowAgenda] = usePref('showAgenda', true)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -33,6 +34,14 @@ export default function SettingsModal({ onClose }) {
           </span>
           <ThemeSwitch className="segmented small" />
         </div>
+        <div className="menu-label">Pages</div>
+        <label className="toggle-row">
+          <span>
+            <strong>Agenda tab</strong>
+            <small>{showAgenda ? 'Assignments, this week and quick links. Opens first.' : 'Hidden. The app opens on the Calendar.'}</small>
+          </span>
+          <input type="checkbox" className="switch" checked={showAgenda} onChange={(e) => setShowAgenda(e.target.checked)} />
+        </label>
         <div className="menu-label">Calendar</div>
         <label className="toggle-row">
           <span>

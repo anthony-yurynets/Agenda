@@ -239,7 +239,7 @@ function SharedViewer({ token, onEdit }) {
           )}
 
           <section className="comp-table-wrap glass-tile">
-            <table className="comp-table">
+            <table className="comp-table full">
               <caption className="sr-only">Competitions in {group?.name ?? 'the shared groups'}</caption>
               <thead>
                 <tr>

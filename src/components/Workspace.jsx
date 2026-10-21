@@ -60,20 +60,21 @@ function useDayCount(fixed) {
  * sidebar becomes a slide-out menu.
  */
 export default function Workspace({ session, backend: backendProp, guest, embed = false }) {
-  // Pages this person may open: owners get all, guests the tools on their link,
-  // the Notion widget just the calendar.
+  // Pages this person may open: owners get all (minus the Agenda if they hid it
+  // in Settings), guests the tools on their link, the Notion widget just the calendar.
+  const [showAgenda] = usePref('showAgenda', true)
   const pages = useMemo(() => {
     if (embed) return PAGES.filter((p) => p.id === 'calendar')
     if (guest) return PAGES.filter((p) => p.shareable && (guest.tools ?? ['calendar']).includes(p.id))
-    return PAGES
-  }, [embed, guest])
+    return showAgenda ? PAGES : PAGES.filter((p) => p.id !== 'agenda')
+  }, [embed, guest, showAgenda])
   const limited = Boolean(guest || embed)
   const [blockStyle] = usePref('blockStyle', 'clear')
   const [rateProductivity] = usePref('rateProductivity', false)
   // The page list (sidebar) only shows when there's somewhere else to go.
   const navPages = !limited || pages.length > 1 ? pages : null
   const allowed = [...pages.map((p) => p.id), ...(limited ? [] : SETTINGS_PAGES)]
-  // Owners always land on the Agenda; guests and the widget on their first page.
+  // Owners land on the Agenda (the Calendar if it's hidden); guests and the widget on their first page.
   const [pagePref, setPage] = useState('agenda')
   const page = allowed.includes(pagePref) ? pagePref : (pages[0]?.id ?? null)
   const canCalendar = pages.some((p) => p.id === 'calendar')

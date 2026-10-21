@@ -1,20 +1,19 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Pencil, Plus, Search, Trophy, X } from 'lucide-react'
+import { ArrowDownUp, Compass, CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Pencil, Plus, Rocket, Search, Trophy, X } from 'lucide-react'
 import { useCompetitions } from '../state/useCompetitions'
 import { supabase } from '../lib/supabase'
 import { ownerCompBackend } from '../lib/compBackends'
 import { localToday } from '../state/useFitness'
 import {
   CATEGORIES,
+  DECISIONS,
   EMPTY_FILTERS,
   MIN_PRESTIGE,
   SORTS,
   STATES,
   WITHIN,
-  addDays,
   buildIndex,
   countdownLabel,
-  daysBetween,
   fmtDate,
   decisionOf,
   filterCount,
@@ -32,25 +31,33 @@ import CompetitionPanel from '../components/competitions/CompetitionPanel'
 import CompFilter from '../components/competitions/CompFilter'
 import GroupShare from '../components/competitions/GroupShare'
 
-// Filters and sort are remembered per browser.
+// Tab, filters and sort are remembered per browser.
 const PREF_KEY = 'agenda:competitions'
 function readPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}')
-    return { sort: SORTS.some((x) => x.id === p.sort) ? p.sort : 'deadline', filters: { ...EMPTY_FILTERS, ...(p.filters ?? {}) }, group: p.group ?? null }
+    return {
+      tab: p.tab === 'explore' ? 'explore' : 'doing',
+      sort: EXPLORE_SORTS.some((x) => x.id === p.sort) ? p.sort : 'deadline',
+      filters: { ...EMPTY_FILTERS, ...(p.filters ?? {}) },
+      group: p.group ?? null,
+    }
   } catch {
-    return { sort: 'deadline', filters: EMPTY_FILTERS, group: null }
+    return { tab: 'doing', sort: 'deadline', filters: EMPTY_FILTERS, group: null }
   }
 }
 
-const MAX_ITEMS = 3
+// Explore never holds competitions we're doing, so sorting by answer adds nothing.
+const EXPLORE_SORTS = SORTS.filter((s) => s.id !== 'decision')
+const EXPLORE_DECISIONS = DECISIONS.filter((d) => d.id !== 'doing')
+const MAX_ITEMS = 4
 
-function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
+/** Explore table row: what it is, how prestigious, when, and whether we're doing it. */
+function Row({ r, tl, store, selected, onOpen, onDecide, onKeyNav }) {
   const c = r.comp
-  const items = (c.submission_items ?? []).map((id) => store.optionsById[id]).filter(Boolean)
   const href = normalizeUrl(c.url)
   return (
-    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' || c.decision === 'no' ? 'finished' : ''} ${c.project_id ? 'doing' : ''}`} onClick={() => onOpen(c.id)}>
+    <tr className={`comp-row cc-${c.category} ${selected ? 'selected' : ''} ${tl.state === 'finished' || c.decision === 'no' ? 'finished' : ''}`} onClick={() => onOpen(c.id)}>
       <td className="c-name">
         <span className="cat-edge" aria-hidden="true" />
         <button className="comp-open" onClick={(e) => (e.stopPropagation(), onOpen(c.id))} onKeyDown={onKeyNav} data-comp-row>
@@ -71,7 +78,54 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
       <td className="c-prestige" data-label="Prestige">
         <PrestigeMeter value={c.prestige} />
       </td>
-      <td className="c-items" data-label="Submit">
+      <td className="c-next" data-label="Next date">
+        <Countdown days={tl.daysToNext} date={tl.next?.date} />
+      </td>
+      <td className="c-doing" data-label="Doing?">
+        <DecisionPicker comp={c} store={store} onChange={(answer) => onDecide(c, answer)} compact />
+      </td>
+    </tr>
+  )
+}
+
+/** Doing card: the next thing due up top, then the timeline and what we have to submit. */
+function DoingCard({ r, tl, today, store, selected, onOpen, onDecide, onKeyNav }) {
+  const c = r.comp
+  const items = (c.submission_items ?? []).map((id) => store.optionsById[id]).filter(Boolean)
+  const href = normalizeUrl(c.url)
+  const done = tl.state === 'finished'
+  return (
+    <article className={`doing-card cc-${c.category} ${selected ? 'selected' : ''} ${done ? 'finished' : ''}`} onClick={() => onOpen(c.id)}>
+      <div className="dc-head">
+        <button className="comp-open" onClick={(e) => (e.stopPropagation(), onOpen(c.id))} onKeyDown={onKeyNav} data-comp-row>
+          <span className="comp-title">{c.name ? <Highlight text={c.name} indices={r.highlight} /> : <span className="muted">Untitled competition</span>}</span>
+        </button>
+        <DecisionPicker comp={c} store={store} onChange={(answer) => onDecide(c, answer)} compact />
+      </div>
+      <div className="dc-meta">
+        <CategoryPill id={c.category} />
+        {href && (
+          <a href={href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="comp-link" aria-label={`Open ${c.name || 'competition'} site`}>
+            {hostOf(c.url)} <ExternalLink size={11} />
+          </a>
+        )}
+      </div>
+      <div className={`dc-next u-${done ? 'none' : urgency(tl.daysToNext)}`}>
+        {done ? (
+          <span className="muted">All stages done</span>
+        ) : tl.next ? (
+          <>
+            <strong>{countdownLabel(tl.daysToNext)}</strong>
+            <span>
+              {tl.next.label || `Stage ${tl.next.index + 1}`} · {fmtDate(tl.next.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+            </span>
+          </>
+        ) : (
+          <span className="muted">No dates yet</span>
+        )}
+      </div>
+      {tl.stages.length > 0 && <TimelineTrack tl={tl} today={today} />}
+      {items.length > 0 && (
         <div className="item-chips">
           {items.slice(0, MAX_ITEMS).map((o) => (
             <span key={o.id} className="item-chip">
@@ -83,19 +137,9 @@ function Row({ r, tl, today, store, selected, onOpen, onKeyNav }) {
               +{items.length - MAX_ITEMS}
             </span>
           )}
-          {!items.length && <span className="muted small">—</span>}
         </div>
-      </td>
-      <td className="c-timeline" data-label="Timeline">
-        <TimelineTrack tl={tl} today={today} />
-      </td>
-      <td className="c-doing" data-label="Doing?">
-        <DecisionPicker comp={c} store={store} onChange={(answer) => store.setDecision(c.id, answer)} compact />
-      </td>
-      <td className="c-next" data-label="Next">
-        <Countdown days={tl.daysToNext} date={tl.next?.date} />
-      </td>
-    </tr>
+      )}
+    </article>
   )
 }
 
@@ -112,6 +156,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
   const { optionsById, projectsById, groupsById } = store
   const today = localToday()
 
+  const [tab, setTab] = useState(() => readPrefs().tab)
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState(() => readPrefs().filters)
   const [sort, setSort] = useState(() => readPrefs().sort)
@@ -149,24 +194,37 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
 
   useEffect(() => {
     try {
-      localStorage.setItem(PREF_KEY, JSON.stringify({ sort, filters, group: groupPref }))
+      localStorage.setItem(PREF_KEY, JSON.stringify({ tab, sort, filters, group: groupPref }))
     } catch {
       // Storage blocked: filters just won't persist.
     }
-  }, [sort, filters, groupPref])
-  // Drop items that no longer exist (deleted options).
+  }, [tab, sort, filters, groupPref])
+  // Drop items that no longer exist (deleted options), and "doing" answers,
+  // which Explore never shows.
   const activeFilters = useMemo(
-    () => ({ ...filters, items: filters.items.filter((id) => optionsById[id]), projects: filters.projects.filter((id) => projectsById[id]) }),
-    [filters, optionsById, projectsById],
+    () => ({ ...filters, decisions: filters.decisions.filter((id) => id !== 'doing'), items: filters.items.filter((id) => optionsById[id]), projects: [] }),
+    [filters, optionsById],
   )
 
   const index = useMemo(() => buildIndex(competitions, optionsById, projectsById), [competitions, optionsById, projectsById])
   const timelines = useMemo(() => Object.fromEntries(competitions.map((c) => [c.id, timelineState(c.timeline, today)])), [competitions, today])
-  const results = useMemo(() => {
-    const hits = searchCompetitions(index, deferredQuery, { today }).filter((r) => matchesFilters(r.comp, activeFilters, timelines[r.comp.id]))
-    // A text query ranks by relevance; otherwise use the chosen sort.
-    return parseQuery(deferredQuery).terms.length ? hits : sortCompetitions(hits, sort, today, (r) => r.comp)
-  }, [index, deferredQuery, activeFilters, timelines, sort, today])
+  // Search narrows both tabs; filters and sort only apply to Explore.
+  const hits = useMemo(() => searchCompetitions(index, deferredQuery, { today }), [index, deferredQuery, today])
+  const ranked = parseQuery(deferredQuery).terms.length > 0
+  const doing = useMemo(() => {
+    const list = hits.filter((r) => decisionOf(r.comp) === 'doing')
+    const sorted = ranked ? list : sortCompetitions(list, 'deadline', today, (r) => r.comp)
+    // Finished ones sink below the ones still running.
+    return [...sorted.filter((r) => timelines[r.comp.id].state !== 'finished'), ...sorted.filter((r) => timelines[r.comp.id].state === 'finished')]
+  }, [hits, ranked, today, timelines])
+  const exploreAll = useMemo(() => hits.filter((r) => decisionOf(r.comp) !== 'doing'), [hits])
+  const explore = useMemo(() => {
+    const list = exploreAll.filter((r) => matchesFilters(r.comp, activeFilters, timelines[r.comp.id]))
+    const sorted = ranked ? list : sortCompetitions(list, sort, today, (r) => r.comp)
+    // "Not doing" goes to the bottom, out of the way.
+    return [...sorted.filter((r) => r.comp.decision !== 'no'), ...sorted.filter((r) => r.comp.decision === 'no')]
+  }, [exploreAll, activeFilters, timelines, ranked, sort, today])
+  const results = tab === 'doing' ? doing : explore
 
   const counts = useMemo(() => {
     const out = { category: {}, state: {}, decision: {}, project: {} }
@@ -190,19 +248,10 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
     return u
   }, [store.competitions])
 
-  // Every stage in the next 45 days, across competitions.
-  const upNext = useMemo(
-    () =>
-      competitions
-        .flatMap((c) => timelines[c.id].stages.filter((s) => s.date >= today && s.date <= addDays(today, 45)).map((s) => ({ c, s })))
-        .sort((a, b) => a.s.date.localeCompare(b.s.date))
-        .slice(0, 8),
-    [competitions, timelines, today],
-  )
-
   const open = openId ? store.competitions.find((c) => c.id === openId) : null
   const nFilters = filterCount(activeFilters)
-  const filtered = Boolean(query.trim() || nFilters)
+  const searching = Boolean(query.trim())
+  const filtered = searching || (tab === 'explore' && nFilters > 0)
   const setF = (patch) => setFilters((f) => ({ ...f, ...patch }))
   const optionName = (id) => optionsById[id]?.name
   const decisionChipLabel = { doing: 'Doing', maybe: 'Maybe', no: 'Not doing', undecided: 'Undecided' }
@@ -210,7 +259,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
   // Removable chips for each active non-category filter.
   const activeChips = [
     ...activeFilters.decisions.map((id) => ({ key: `d-${id}`, label: decisionChipLabel[id], clear: () => setF({ decisions: filters.decisions.filter((x) => x !== id) }) })),
-    ...activeFilters.projects.map((id) => ({ key: `p-${id}`, label: `Project: ${projectsById[id].name}`, clear: () => setF({ projects: filters.projects.filter((x) => x !== id) }) })),
+    ...activeFilters.categories.map((id) => ({ key: `c-${id}`, label: CATEGORIES.find((x) => x.id === id)?.label ?? id, clear: () => setF({ categories: filters.categories.filter((x) => x !== id) }) })),
     ...activeFilters.states.map((id) => ({ key: `s-${id}`, label: STATES.find((x) => x.id === id).label, clear: () => setF({ states: filters.states.filter((x) => x !== id) }) })),
     activeFilters.within !== null && { key: 'within', label: `Next date ≤ ${WITHIN.find((x) => x.id === activeFilters.within)?.label ?? `${activeFilters.within} days`}`, clear: () => setF({ within: null }) },
     activeFilters.minPrestige !== null && { key: 'prestige', label: `Prestige ${MIN_PRESTIGE.find((x) => x.id === activeFilters.minPrestige)?.label ?? `${activeFilters.minPrestige}+`}`, clear: () => setF({ minPrestige: null }) },
@@ -251,12 +300,22 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
     else btns[Math.min(i, btns.length - 1)]?.focus()
   }
 
-  const toggleCat = (id) => setF({ categories: filters.categories.includes(id) ? filters.categories.filter((x) => x !== id) : [...filters.categories, id] })
   const clearAll = () => (setQuery(''), setFilters(EMPTY_FILTERS))
+  // Saying yes (picking a project) or no moves a competition between tabs; say where it went.
+  const decide = (c, answer) => {
+    const was = decisionOf(c)
+    store.setDecision(c.id, answer)
+    const name = c.name || 'Competition'
+    const nowDoing = answer !== null && answer !== 'maybe' && answer !== 'no'
+    if (nowDoing && was !== 'doing') toast(`${name} moved to Doing`)
+    else if (!nowDoing && was === 'doing') toast(`${name} moved to Explore`)
+  }
   // A guest's new competition has to land in one of the shared groups.
   const addGroup = groupId ?? (guest ? store.groups[0]?.id : null)
-  const add = () =>
+  const add = () => {
+    setTab('explore')
     setOpenId(store.createCompetition({ category: filters.categories.length === 1 ? filters.categories[0] : 'other', group_ids: addGroup ? [addGroup] : [] }))
+  }
   const createGroup = (e) => {
     e.preventDefault()
     const id = store.groupList.create(newGroup ?? '')
@@ -264,29 +323,33 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
     setNewGroup(null)
   }
 
+  const tabs = [
+    { id: 'doing', label: 'Doing', icon: Rocket, count: doing.length },
+    { id: 'explore', label: 'Explore', icon: Compass, count: exploreAll.length },
+  ]
+  const itemProps = (r) => ({ r, tl: timelines[r.comp.id], today, store, selected: r.comp.id === openId, onOpen: setOpenId, onDecide: decide, onKeyNav })
+
   return (
     <div className="comps">
       <div className="comps-main">
-        <header className="comps-head glass-tile">
-          <div className="comps-title">
-            <Trophy size={20} />
-            <div>
-              <h2>{group ? group.name : guest ? 'Shared competitions' : 'Competitions'}</h2>
-              <p className="muted small">
-                {guest && `${store.info?.owner ? `Shared by ${store.info.owner}` : 'Shared with you'} · `}
-                {competitions.length} {group ? 'in this group' : guest ? 'shared' : 'tracked'}
-                {upNext.length > 0 && ` · next date ${countdownLabel(daysBetween(today, upNext[0].s.date)).toLowerCase()}`}
-              </p>
-            </div>
+        <header className="comps-head">
+          <div className="segmented comps-tabs" role="tablist" aria-label="Competitions">
+            {tabs.map(({ id, label, icon: Icon, count }) => (
+              <button key={id} role="tab" id={`comps-tab-${id}`} aria-selected={tab === id} aria-controls="comps-body" className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+                <Icon size={15} />
+                {label}
+                <span className="chip-count">{count}</span>
+              </button>
+            ))}
           </div>
           <label className="search comps-search">
-            <Search size={17} />
+            <Search size={16} />
             <input
               ref={searchRef}
-              placeholder="Search name, item, stage…  try  #research  >7  soon"
+              placeholder={tab === 'doing' ? 'Search what we’re doing…' : 'Search name, item, stage…  try  #research  >7  soon'}
               value={query}
               aria-label="Search competitions"
-              aria-controls="comp-table"
+              aria-controls="comps-body"
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') (setQuery(''), e.currentTarget.blur())
@@ -305,7 +368,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
           <div className="comps-actions">
             {guest && (
               <span className="view-only muted small">
-                <Pencil size={13} /> Can edit
+                <Pencil size={13} /> {store.info?.owner ? `Shared by ${store.info.owner}` : 'Can edit'}
               </span>
             )}
             {!guest && (
@@ -343,148 +406,130 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
           </div>
         </header>
 
-        <nav className="comp-groups" aria-label="Groups">
-          <FolderOpen size={15} className="muted" aria-hidden="true" />
-          <div className="chips" role="tablist">
-            {[{ id: null, name: guest ? 'All shared' : 'All' }, ...store.groups].map((g) => (
-              <button key={g.id ?? 'all'} role="tab" aria-selected={groupId === g.id} className={`chip group-chip ${groupId === g.id ? 'on' : ''}`} onClick={() => setGroup(g.id)}>
+        <div className="comps-toolbar">
+          <div className="chips comp-groups" role="group" aria-label="Group">
+            {[{ id: null, name: guest ? 'All shared' : 'All groups' }, ...store.groups].map((g) => (
+              <button key={g.id ?? 'all'} aria-pressed={groupId === g.id} className={`chip group-chip ${groupId === g.id ? 'on' : ''}`} onClick={() => setGroup(g.id)}>
+                {g.id && <FolderOpen size={13} aria-hidden="true" />}
                 {g.name}
                 <span className="chip-count">{g.id ? (groupCounts[g.id] ?? 0) : store.competitions.length}</span>
               </button>
             ))}
-          </div>
-          {guest ? null : newGroup === null ? (
-            <button className="btn ghost sm" onClick={() => setNewGroup('')}>
-              <Plus size={13} /> Group
-            </button>
-          ) : (
-            <form className="group-new" onSubmit={createGroup}>
-              <input
-                autoFocus
-                placeholder="Group name"
-                value={newGroup}
-                maxLength={80}
-                aria-label="New group name"
-                onChange={(e) => setNewGroup(e.target.value)}
-                onBlur={() => !newGroup.trim() && setNewGroup(null)}
-                onKeyDown={(e) => e.key === 'Escape' && setNewGroup(null)}
-              />
-              <button className="btn primary sm" disabled={!newGroup.trim()}>
-                Create
+            {guest ? null : newGroup === null ? (
+              <button className="btn ghost sm" onClick={() => setNewGroup('')} aria-label="New group">
+                <Plus size={13} /> Group
               </button>
-            </form>
-          )}
-          <span className="flex1" />
-          {group && !guest && <GroupShare key={group.id} group={group} groups={store.groups} toast={toast} />}
-        </nav>
-
-        <div className="comps-filters">
-          <div className="chips" role="group" aria-label="Filter by category">
-            {CATEGORIES.map((c) => {
-              const on = filters.categories.includes(c.id)
-              return (
-                <button key={c.id} className={`chip cat-chip cc-${c.id} ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggleCat(c.id)}>
-                  <i aria-hidden="true" />
-                  {c.label}
-                  <span className="chip-count">{counts.category[c.id] ?? 0}</span>
+            ) : (
+              <form className="group-new" onSubmit={createGroup}>
+                <input
+                  autoFocus
+                  placeholder="Group name"
+                  value={newGroup}
+                  maxLength={80}
+                  aria-label="New group name"
+                  onChange={(e) => setNewGroup(e.target.value)}
+                  onBlur={() => !newGroup.trim() && setNewGroup(null)}
+                  onKeyDown={(e) => e.key === 'Escape' && setNewGroup(null)}
+                />
+                <button className="btn primary sm" disabled={!newGroup.trim()}>
+                  Create
                 </button>
-              )
-            })}
+              </form>
+            )}
+            {group && !guest && <GroupShare key={group.id} group={group} groups={store.groups} toast={toast} />}
           </div>
           <span className="flex1" />
-          <CompFilter value={activeFilters} onChange={setFilters} options={store.options} projects={store.projects} counts={counts} />
-          <div className="segmented small" role="radiogroup" aria-label="Sort by">
-            {SORTS.map((s) => (
-              <button key={s.id} role="radio" aria-checked={sort === s.id} className={sort === s.id ? 'on' : ''} onClick={() => setSort(s.id)}>
-                {s.label}
-              </button>
-            ))}
-          </div>
+          {tab === 'explore' && (
+            <>
+              <CompFilter value={activeFilters} onChange={setFilters} options={store.options} projects={store.projects} counts={counts} decisions={EXPLORE_DECISIONS} />
+              <label className="comps-sort">
+                <ArrowDownUp size={14} aria-hidden="true" />
+                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort by">
+                  {EXPLORE_SORTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
         </div>
 
-        {(activeChips.length > 0 || filtered) && (
+        {(activeChips.length > 0 && tab === 'explore') || searching ? (
           <div className="active-filters" aria-label="Active filters">
-            {activeChips.map((c) => (
-              <button key={c.key} className="af-chip" onClick={c.clear} aria-label={`Remove filter: ${c.label}`}>
-                {c.label} <X size={12} />
-              </button>
-            ))}
+            {tab === 'explore' &&
+              activeChips.map((c) => (
+                <button key={c.key} className="af-chip" onClick={c.clear} aria-label={`Remove filter: ${c.label}`}>
+                  {c.label} <X size={12} />
+                </button>
+              ))}
             <span className="af-count muted small">
-              {results.length} of {competitions.length}
+              {results.length} of {tab === 'doing' ? competitions.filter((c) => decisionOf(c) === 'doing').length : competitions.length - competitions.filter((c) => decisionOf(c) === 'doing').length}
             </span>
             <button className="btn ghost sm" onClick={clearAll}>
               Clear all
             </button>
           </div>
-        )}
+        ) : null}
 
-        {upNext.length > 0 && !filtered && (
-          <section className="up-next" aria-label="Upcoming dates">
-            {upNext.map(({ c, s }) => {
-              const d = daysBetween(today, s.date)
-              return (
-                <button key={`${c.id}-${s.index}`} className={`un-card cc-${c.category} u-${urgency(d)}`} onClick={() => setOpenId(c.id)}>
-                  <span className="un-when">
-                    <strong>{countdownLabel(d)}</strong> · {fmtDate(s.date, { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
-                  <span className="un-comp">{c.name || 'Untitled'}</span>
-                  <span className="un-stage">{s.label || `Stage ${s.index + 1}`}</span>
-                </button>
-              )
-            })}
-          </section>
-        )}
-
-        <section className="comp-table-wrap glass-tile" ref={tableRef}>
-          <table className="comp-table" id="comp-table">
-            <caption className="sr-only">
-              Competitions{filtered ? `, ${results.length} matching` : ''}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Competition</th>
-                <th scope="col">Category</th>
-                <th scope="col">Prestige</th>
-                <th scope="col">Submission items</th>
-                <th scope="col">Timeline</th>
-                <th scope="col">Doing?</th>
-                <th scope="col">Next date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => (
-                <Row
-                  key={r.comp.id}
-                  r={r}
-                  tl={timelines[r.comp.id]}
-                  today={today}
-                  store={store}
-                  selected={r.comp.id === openId}
-                  onOpen={setOpenId}
-                  onKeyNav={onKeyNav}
-                />
-              ))}
-            </tbody>
-          </table>
+        <section className="comps-body" id="comps-body" role="tabpanel" aria-labelledby={`comps-tab-${tab}`} ref={tableRef}>
+          {tab === 'doing' ? (
+            doing.length > 0 && (
+              <div className="doing-grid">
+                {doing.map((r) => (
+                  <DoingCard key={r.comp.id} {...itemProps(r)} />
+                ))}
+              </div>
+            )
+          ) : (
+            explore.length > 0 && (
+              <div className="comp-table-wrap glass-tile">
+                <table className="comp-table">
+                  <caption className="sr-only">Competitions to explore{filtered ? `, ${explore.length} matching` : ''}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Competition</th>
+                      <th scope="col">Category</th>
+                      <th scope="col">Prestige</th>
+                      <th scope="col">Next date</th>
+                      <th scope="col">Doing?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {explore.map((r) => (
+                      <Row key={r.comp.id} {...itemProps(r)} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
           {!results.length && !store.loading && (
             <div className="comp-empty">
-              {competitions.length ? (
+              {filtered ? (
                 <>
-                  <p>{query.trim() ? `No competitions match “${query.trim()}”${nFilters ? ' with these filters' : ''}.` : 'No competitions match these filters.'}</p>
+                  <p>{searching ? `Nothing matches “${query.trim()}”${tab === 'explore' && nFilters ? ' with these filters' : ''}.` : 'Nothing matches these filters.'}</p>
                   <p className="muted small">
-                    {query.trim() ? 'Try fewer words, or ' : ''}
                     <button className="link-btn" onClick={clearAll}>
-                      clear {query.trim() && nFilters ? 'search and filters' : query.trim() ? 'the search' : 'all filters'}
+                      Clear {searching && tab === 'explore' && nFilters ? 'search and filters' : searching ? 'the search' : 'all filters'}
                     </button>
                   </p>
+                </>
+              ) : tab === 'doing' ? (
+                <>
+                  <Rocket size={26} className="muted" />
+                  <p>{group ? `Not entering anything in ${group.name} yet.` : 'Not entering anything yet.'}</p>
+                  <p className="muted small">In Explore, set “Doing?” to a project and it shows up here.</p>
+                  <button className="btn primary sm" onClick={() => setTab('explore')}>
+                    <Compass size={14} /> Explore competitions
+                  </button>
                 </>
               ) : (
                 <>
                   <Trophy size={26} className="muted" />
-                  <p>{group ? `Nothing in ${group.name} yet.` : 'Track your first competition.'}</p>
-                  <p className="muted small">
-                    {group ? 'Add one here, or open any competition and pick this group.' : 'Add one, or ask your AI to research and add competitions for you.'}
-                  </p>
+                  <p>{group ? `Nothing to explore in ${group.name}.` : competitions.length ? 'You’re doing everything you’ve found.' : 'Track your first competition.'}</p>
+                  <p className="muted small">Add one, or ask your AI to research and add competitions for you.</p>
                   <button className="btn primary sm" onClick={add}>
                     <Plus size={14} /> Add competition
                   </button>
@@ -492,13 +537,14 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
               )}
             </div>
           )}
-          <p className="comp-hint muted small" aria-live="polite">
-            {filtered ? `${results.length} of ${competitions.length}` : `${competitions.length} competitions`}
-            <span>
-              <kbd>/</kbd> search · <kbd>↑</kbd>
-              <kbd>↓</kbd> move · <kbd><CornerDownLeft size={10} /></kbd> open
-            </span>
-          </p>
+          {results.length > 0 && (
+            <p className="comp-hint muted small">
+              <span>
+                <kbd>/</kbd> search · <kbd>↑</kbd>
+                <kbd>↓</kbd> move · <kbd><CornerDownLeft size={10} /></kbd> open
+              </span>
+            </p>
+          )}
         </section>
       </div>
 

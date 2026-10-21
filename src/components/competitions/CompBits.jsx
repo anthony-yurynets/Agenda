@@ -192,7 +192,7 @@ export function DecisionPicker({ comp, store, onChange, compact = false }) {
   const toggle = () => {
     // Open upward when the scroll area has no room below (the table clips overflow).
     const box = ref.current?.getBoundingClientRect()
-    const area = ref.current?.closest('.comp-table-wrap, .bp-scroll')?.getBoundingClientRect()
+    const area = ref.current?.closest('.comp-table-wrap, .comps-body, .bp-scroll')?.getBoundingClientRect()
     if (box && area) {
       const below = area.bottom - box.bottom
       const above = box.top - area.top

@@ -16,8 +16,12 @@ function Single({ label, options, value, onChange }) {
   )
 }
 
-/** Filter dropdown: category, status, next date, prestige and submission items. */
-export default function CompFilter({ value: f, onChange, options, projects, counts }) {
+/**
+ * Filter dropdown: category, status, next date, prestige and submission items.
+ * `decisions` limits the "Are we doing it?" answers offered (and hides projects
+ * when 'doing' isn't one of them).
+ */
+export default function CompFilter({ value: f, onChange, options, projects, counts, decisions = DECISIONS }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const set = (patch) => onChange({ ...f, ...patch })
@@ -62,7 +66,7 @@ export default function CompFilter({ value: f, onChange, options, projects, coun
           <div className="cf-section">
             <span className="field-label">Are we doing it?</span>
             <div className="chips">
-              {DECISIONS.map((d) => {
+              {decisions.map((d) => {
                 const on = f.decisions.includes(d.id)
                 return (
                   <button key={d.id} className={`chip dec-chip d-${d.id} ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => set({ decisions: toggleIn(f.decisions, d.id) })}>
@@ -73,7 +77,7 @@ export default function CompFilter({ value: f, onChange, options, projects, coun
                 )
               })}
             </div>
-            {projects.length > 0 && (
+            {projects.length > 0 && decisions.some((d) => d.id === 'doing') && (
               <div className="chips cf-projects" role="group" aria-label="Doing with project">
                 {projects.map((p) => {
                   const on = f.projects.includes(p.id)
