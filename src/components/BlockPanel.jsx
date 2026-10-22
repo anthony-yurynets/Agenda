@@ -5,6 +5,7 @@ import { isInTemplate, seriesOf } from '../lib/recurrence'
 import RepeatEditor from './RepeatEditor'
 import { ancestors, buildChildrenMap } from '../lib/tree'
 import StatusIcon from './StatusIcon'
+import NotesEditor from './NotesEditor'
 
 const nextStatus = (s) => {
   const order = ['planned', 'in_progress', 'done']
@@ -235,17 +236,16 @@ export default function BlockPanel({ id, store, blocks, onSelect, onClose, toast
           </label>
         )}
 
-        <label className="field">
+        <div className="field">
           <span className="field-label">Notes</span>
-          <textarea
-            className="notes"
-            rows={3}
-            placeholder="Add details, links, a checklist…"
+          <NotesEditor
+            label="Notes"
+            placeholder="Add details, links, a checklist… type “/” for blocks"
             value={block.notes}
             maxLength={5000}
-            onChange={(e) => updateBlock(id, { notes: e.target.value }, { debounce: 500 })}
+            onChange={(notes) => updateBlock(id, { notes }, { debounce: 500 })}
           />
-        </label>
+        </div>
 
         <div className="sub-head">
           <span className="field-label">Sub-blocks {kids.length > 0 && <span className="count">{kids.length}</span>}</span>

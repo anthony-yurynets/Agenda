@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Bot, ExternalLink, Plus, Sigma, Trash2, X } from 'lucide-react'
 import { CATEGORIES, addDays, daysBetween, fmtDate, isDate, normalizeUrl, prestigeTier, stages as sortStages } from '../../lib/competitions'
 import { DecisionPicker, OptionManager } from './CompBits'
+import NotesEditor from '../NotesEditor'
 
 /** Timeline editor: one row per stage, as a vertical rail. Date and "Day N" stay in sync. */
 function TimelineEditor({ timeline, today, onChange }) {
@@ -158,17 +159,16 @@ export default function CompetitionPanel({ comp: c, store, today, onClose, toast
           </div>
         </label>
 
-        <label className="field">
+        <div className="field">
           <span className="field-label">Description</span>
-          <textarea
-            className="notes"
-            rows={3}
-            placeholder="What it is, eligibility, prizes, notes to self…"
+          <NotesEditor
+            label="Description"
+            placeholder="What it is, eligibility, prizes, notes to self… type “/” for blocks"
             value={c.description}
             maxLength={4000}
-            onChange={(e) => update({ description: e.target.value }, { debounce: 500 })}
+            onChange={(description) => update({ description }, { debounce: 500 })}
           />
-        </label>
+        </div>
 
         <span className="field-label">Category</span>
         <div className="chips" role="radiogroup" aria-label="Category">

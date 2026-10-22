@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Bot, Check, Flag, HeartPulse, Plus, Trash2, X } from 'lucide-react'
 import { GROUPS, MUSCLES, MUSCLE_BY_ID, distanceUnit, isCardio, muscleLabel } from '../../lib/fitness'
+import NotesEditor from '../NotesEditor'
 
 const STATUSES = [
   { id: 'planned', label: 'Planned' },
@@ -190,17 +191,16 @@ export default function WorkoutPanel({ workout: w, workouts, fit, unit, onClose,
           </button>
         </div>
 
-        <label className="field">
+        <div className="field">
           <span className="field-label">Notes</span>
-          <textarea
-            className="notes"
-            rows={3}
-            placeholder="How did it feel?"
+          <NotesEditor
+            label="Notes"
+            placeholder="How did it feel? Type “/” for blocks"
             value={w.notes}
             maxLength={4000}
-            onChange={(e) => fit.updateWorkout(w.id, { notes: e.target.value }, { debounce: 500 })}
+            onChange={(notes) => fit.updateWorkout(w.id, { notes }, { debounce: 500 })}
           />
-        </label>
+        </div>
       </div>
 
       <div className="bp-foot">

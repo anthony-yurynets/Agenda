@@ -30,6 +30,7 @@ import { CategoryPill, Countdown, DecisionPicker, Highlight, OptionManager, Pres
 import CompetitionPanel from '../components/competitions/CompetitionPanel'
 import CompFilter from '../components/competitions/CompFilter'
 import GroupShare from '../components/competitions/GroupShare'
+import { notesPreview } from '../lib/notes'
 
 // Tab, filters and sort are remembered per browser.
 const PREF_KEY = 'agenda:competitions'
@@ -69,7 +70,7 @@ function Row({ r, tl, store, selected, onOpen, onDecide, onKeyNav }) {
               {hostOf(c.url)} <ExternalLink size={11} />
             </a>
           )}
-          {c.description && <span className="comp-desc">{c.description}</span>}
+          {c.description && <span className="comp-desc">{notesPreview(c.description)}</span>}
         </div>
       </td>
       <td className="c-cat" data-label="Category">

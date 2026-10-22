@@ -4,6 +4,7 @@ import { fromMinutes, hasStatus, statusLabel } from '../lib/domain'
 import { format, isSameDay, toISODate } from '../lib/dates'
 import { buildChildrenMap } from '../lib/tree'
 import StatusIcon from './StatusIcon'
+import { notesPreview } from '../lib/notes'
 
 export default function ListView({ days, store, blocks, visible, search, selectedId, onSelect, onNew }) {
   const childrenMap = useMemo(() => buildChildrenMap(blocks), [blocks])
@@ -120,7 +121,7 @@ function Row({ block, depth, childrenMap, store, selectedId, onSelect, collapsed
             {depth === 0 && (block.virtual || block.recurrence_id) && <Repeat size={12} className="ai-mark" />}
             {block.source === 'ai' && <Bot size={12} className="ai-mark" />}
           </span>
-          {block.notes && <span className="list-notes">{block.notes}</span>}
+          {block.notes && <span className="list-notes">{notesPreview(block.notes)}</span>}
         </span>
         {tracked.length > 0 && (
           <span className="list-progress" title={`${done} of ${tracked.length} sub-blocks done`}>

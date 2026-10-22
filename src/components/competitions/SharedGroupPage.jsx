@@ -19,6 +19,8 @@ import {
 } from '../../lib/competitions'
 import { CategoryPill, Countdown, DecisionBadge, Highlight, PrestigeMeter, TimelineTrack } from './CompBits'
 import Logo from '../Logo'
+import { notesPreview } from '../../lib/notes'
+import NotesEditor from '../NotesEditor'
 
 const POLL_MS = 30_000
 const byId = (rows) => Object.fromEntries(rows.map((r) => [r.id, r]))
@@ -44,7 +46,7 @@ function ViewPanel({ comp: c, optionsById, projectsById, tl, onClose }) {
             {hostOf(c.url)} <ExternalLink size={12} />
           </a>
         )}
-        {c.description && <p className="vp-desc">{c.description}</p>}
+        {c.description && <NotesEditor readOnly value={c.description} label="Description" />}
 
         <span className="field-label">Are we doing this?</span>
         <DecisionBadge comp={c} projectsById={projectsById} undecided="Undecided" />
@@ -274,7 +276,7 @@ function SharedViewer({ token, onEdit }) {
                               {hostOf(c.url)} <ExternalLink size={11} />
                             </a>
                           )}
-                          {c.description && <span className="comp-desc">{c.description}</span>}
+                          {c.description && <span className="comp-desc">{notesPreview(c.description)}</span>}
                         </div>
                       </td>
                       <td className="c-cat" data-label="Category">

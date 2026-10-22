@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Bot, CalendarPlus, Repeat, UserRound } from 'lucide-react'
 import { fromMinutes, hasStatus, statusLabel } from '../lib/domain'
 import StatusIcon from './StatusIcon'
+import { notesPreview } from '../lib/notes'
 
 // Vertical rhythm (px) — must match .block-* rules in index.css.
 const METRICS = {
@@ -66,7 +67,7 @@ function BlockCard({ block, height, depth = 0, ctx, style, onPointerDown, onResi
           </div>
         )}
         <div className={`block-title ${nest || !showTime ? 'one-line' : ''}`}>{block.title || 'Untitled'}</div>
-        {showNote && <div className="block-note">{block.notes.trim()}</div>}
+        {showNote && <div className="block-note">{notesPreview(block.notes)}</div>}
 
         {nest && (
           <div className="block-region" style={{ height: regionH }}>
