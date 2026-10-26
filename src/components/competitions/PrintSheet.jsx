@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { categoryLabel, countdownLabel, fmtDate, hostOf, prestigeTier } from '../../lib/competitions'
+import { fmtDate, hostOf } from '../../lib/competitions'
 
 const DATE_OPTS = { month: 'short', day: 'numeric', year: 'numeric' }
 
@@ -19,10 +19,7 @@ export default function PrintSheet({ rows, timelines, store, title }) {
           <tr>
             <th>#</th>
             <th>Competition</th>
-            <th>Category</th>
             <th>Project</th>
-            <th>Prestige</th>
-            <th>Next stage</th>
             <th>Timeline</th>
             <th>Submission items</th>
             <th>Website</th>
@@ -32,22 +29,12 @@ export default function PrintSheet({ rows, timelines, store, title }) {
           {rows.map((r, i) => {
             const c = r.comp
             const tl = timelines[c.id]
-            const tier = prestigeTier(c.prestige)
             const items = (c.submission_items ?? []).map((id) => store.optionsById[id]?.name).filter(Boolean)
             return (
               <tr key={c.id} className={tl.state === 'finished' ? 'done' : ''}>
                 <td>{i + 1}</td>
                 <td className="ps-name">{c.name || 'Untitled competition'}</td>
-                <td>{categoryLabel(c.category)}</td>
                 <td>{store.projectsById[c.project_id]?.name ?? ''}</td>
-                <td>{c.prestige ? `${c.prestige}/10${tier ? ` · ${tier.label}` : ''}` : ''}</td>
-                <td>
-                  {tl.state === 'finished'
-                    ? 'All stages done'
-                    : tl.next
-                      ? `${tl.next.label || `Stage ${tl.next.index + 1}`} — ${fmtDate(tl.next.date, DATE_OPTS)} (${countdownLabel(tl.daysToNext)})`
-                      : 'No dates yet'}
-                </td>
                 <td>
                   {tl.stages.map((s) => (
                     <div key={s.index}>
