@@ -1903,3 +1903,23 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
 .group-share .access-picker.compact button { height: 22px; padding: 0 8px; }
 .group-share .comp-link-row .btn { width: auto; height: 28px; padding: 0 10px; justify-content: center; }
 @media (max-width: 520px) { .group-share { width: min(420px, calc(100vw - 32px)); } }
+
+/* ─── Print: competitions spreadsheet ─────────────────────────────────────── */
+.print-sheet { display: none; }
+@media print {
+  @page { size: landscape; margin: 12mm; }
+  html, body, #root { height: auto; background: #fff !important; }
+  body > *:not(.print-sheet) { display: none !important; }
+  .print-sheet { display: block; color: #000; font: 10pt/1.35 system-ui, -apple-system, sans-serif; }
+  .print-sheet h1 { font-size: 16pt; margin: 0 0 2pt; }
+  .print-sheet .ps-meta { margin: 0 0 8pt; color: #555; }
+  .print-sheet table { width: 100%; border-collapse: collapse; }
+  .print-sheet th, .print-sheet td { border: 0.75pt solid #999; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  .print-sheet th { background: #e8e8e8 !important; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-sheet thead { display: table-header-group; }
+  .print-sheet tr { break-inside: avoid; }
+  .print-sheet tbody tr:nth-child(even) td { background: #f6f6f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-sheet .ps-name { font-weight: 600; }
+  .print-sheet td { overflow-wrap: anywhere; }
+  .print-sheet tr.done td { color: #777; }
+}

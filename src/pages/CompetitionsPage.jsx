@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownUp, Compass, CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Pencil, Plus, Rocket, Search, Trophy, X } from 'lucide-react'
+import { ArrowDownUp, Compass, CornerDownLeft, ExternalLink, FolderOpen, ListChecks, Pencil, Plus, Printer, Rocket, Search, Trophy, X } from 'lucide-react'
 import { useCompetitions } from '../state/useCompetitions'
 import { supabase } from '../lib/supabase'
 import { ownerCompBackend } from '../lib/compBackends'
@@ -30,6 +30,7 @@ import { CategoryPill, Countdown, DecisionPicker, Highlight, OptionManager, Pres
 import CompetitionPanel from '../components/competitions/CompetitionPanel'
 import CompFilter from '../components/competitions/CompFilter'
 import GroupShare from '../components/competitions/GroupShare'
+import PrintSheet from '../components/competitions/PrintSheet'
 import { notesPreview } from '../lib/notes'
 
 // Tab, filters and sort are remembered per browser.
@@ -401,6 +402,11 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
               )}
             </div>
             )}
+            {tab === 'doing' && doing.length > 0 && (
+              <button className="btn ghost" onClick={() => window.print()} title="Print the competitions you're doing as a table">
+                <Printer size={15} /> Print
+              </button>
+            )}
             <button className="btn primary" onClick={add}>
               <Plus size={15} /> Add
             </button>
@@ -549,6 +555,7 @@ export default function CompetitionsPage({ session, toast, focusId = null, onOpe
         </section>
       </div>
 
+      {tab === 'doing' && <PrintSheet rows={doing} timelines={timelines} store={store} title={group ? `Doing · ${group.name}` : 'Competitions we’re doing'} />}
       {open && <CompetitionPanel key={open.id} comp={open} store={store} today={today} onClose={() => setOpenId(null)} toast={toast} onOpenPrep={open.id === prepCompId ? onOpenPrep : null} />}
     </div>
   )
