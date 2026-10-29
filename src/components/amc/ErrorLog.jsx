@@ -1,8 +1,19 @@
 import { useMemo, useState } from 'react'
-import { Plus, RotateCcw, Trash2 } from 'lucide-react'
-import { REASONS, TOPICS, countBy, reasonLabel, topicLabel } from '../../lib/amc'
+import { ExternalLink, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { REASONS, TOPICS, aopsUrl, countBy, reasonLabel, topicLabel } from '../../lib/amc'
 
 const EMPTY = { test: '', problem: '', topic: 'algebra', reason: 'concept', key_idea: '' }
+
+/** Opens the problem on the AoPS wiki, when the test name says which one it is. */
+function OpenProblem({ e }) {
+  const url = aopsUrl(e.test, e.problem)
+  if (!url) return null
+  return (
+    <a className="icon-btn sm el-open" href={url} target="_blank" rel="noreferrer" title="Open on AoPS" aria-label="Open problem on AoPS">
+      <ExternalLink size={13} />
+    </a>
+  )
+}
 
 /** Bars of counts; the largest is called out as the weakest. */
 function Counts({ title, list, counts, active, onPick }) {
@@ -138,7 +149,12 @@ export default function ErrorLog({ amc }) {
           <tbody>
             {shown.map((e) => (
               <tr key={e.id} className={e.redone ? 'done' : ''}>
-                <td data-label="Test">{e.test || <span className="muted">—</span>}</td>
+                <td data-label="Test">
+                  <span className="el-test">
+                    {e.test || <span className="muted">—</span>}
+                    <OpenProblem e={e} />
+                  </span>
+                </td>
                 <td data-label="#" className="num">{e.problem ?? '—'}</td>
                 <td data-label="Topic">
                   <span className={`amc-tag t-${e.topic}`}>{topicLabel(e.topic)}</span>
@@ -176,6 +192,7 @@ export default function ErrorLog({ amc }) {
                 <span className="rq-what">
                   {e.test || 'Untitled'} {e.problem ? `#${e.problem}` : ''}
                 </span>
+                <OpenProblem e={e} />
                 <span className={`amc-tag t-${e.topic}`}>{topicLabel(e.topic)}</span>
                 {e.key_idea && <span className="rq-idea muted">{e.key_idea}</span>}
               </li>

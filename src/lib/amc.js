@@ -158,3 +158,18 @@ export const guessAmcCompetition = (comps) => {
   const hits = comps.filter((c) => /\bamc\b/i.test(c.name ?? ''))
   return hits.length === 1 ? hits[0] : (hits.find((c) => /\bamc\s*10\b/i.test(c.name)) ?? null)
 }
+
+/**
+ * The AoPS wiki page for a logged problem, read off the test name
+ * ("AMC 10A 2022", "2021 Fall 10B", …). The problem number links straight to
+ * that problem; without one it opens the whole test. Null if the name has no
+ * year or no 10A/10B (or 12A/12B).
+ */
+export function aopsUrl(test, problem) {
+  const year = test?.match(/\b(19|20)\d{2}\b/)?.[0]
+  const level = test?.match(/(?<!\d)(10|12)\s*([AB])\b/i)
+  if (!year || !level) return null
+  const fall = /\bfall\b/i.test(test) ? 'Fall_' : ''
+  const page = `${year}_${fall}AMC_${level[1]}${level[2].toUpperCase()}_Problems`
+  return `https://artofproblemsolving.com/wiki/index.php/${page}${problem ? `/Problem_${problem}` : ''}`
+}

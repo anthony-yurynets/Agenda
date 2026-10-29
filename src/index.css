@@ -1819,6 +1819,9 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
 .el-table th:nth-child(2) { width: 40px; } .el-table th:nth-child(6) { width: 64px; } .el-table th:nth-child(7) { width: 36px; }
 .el-table tr.done td { opacity: 0.55; }
 .el-idea { overflow-wrap: anywhere; }
+.el-test { display: inline-flex; align-items: center; gap: 4px; }
+.el-open { color: var(--muted); flex-shrink: 0; }
+.el-open:hover { color: var(--accent); }
 .redo-queue { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline-soft); }
 .redo-queue ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .redo-queue li { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 6px 8px; border-radius: 8px; background: var(--fill); font-size: 13px; }
