@@ -25,7 +25,7 @@ server so AI assistants can plan alongside you.
 
 1. **Env:** `cp .env.example .env` and fill in the values from Supabase → Project Settings → API.
 2. **Database:** open Supabase → SQL Editor and run each file in [`supabase/migrations`](supabase/migrations) in order
-   (`0001_init.sql` → `0015_competition_links.sql`). All are safe to re-run.
+   (`0001_init.sql` → `0018_shared_files.sql`). All are safe to re-run.
 3. **Google sign-in:**
    - In Google Cloud Console → APIs & Services → Credentials, create an *OAuth client ID* (Web application).
      Add the authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`.

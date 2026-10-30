@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the parts of supabase-js the app uses.
-const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [], competition_groups: [], assignments: [], assignment_subjects: [], dashboard_links: [], amc_prep: [], amc_mocks: [], amc_errors: [] }
+const tables = { blocks: [], categories: [], api_tokens: [], share_links: [], workouts: [], workout_exercises: [], workout_sets: [], fitness_settings: [], competitions: [], competition_options: [], competition_projects: [], competition_groups: [], assignments: [], assignment_subjects: [], dashboard_links: [], amc_prep: [], amc_mocks: [], amc_errors: [], shared_files: [] }
 let clock = 0
 const stamp = () => new Date(Date.UTC(2026, 0, 1) + ++clock).toISOString()
 
@@ -97,6 +97,24 @@ class Query {
 
 const channel = { on() { return channel }, subscribe() { return channel } }
 
+// Storage: blobs in memory; signed URLs are object URLs.
+const objects = new Map()
+const storage = {
+  objects,
+  from: () => ({
+    async upload(path, blob) {
+      if (objects.has(path)) return { data: null, error: { message: 'The resource already exists' } }
+      objects.set(path, blob)
+      return { data: { path }, error: null }
+    },
+    async remove(paths) { paths.forEach((p) => objects.delete(p)); return { data: null, error: null } },
+    async createSignedUrl(path) {
+      const blob = objects.get(path)
+      return blob ? { data: { signedUrl: URL.createObjectURL(blob) }, error: null } : { data: null, error: { message: 'Object not found' } }
+    },
+  }),
+}
+
 export const fakeSupabase = {
   tables,
   async rpc(name, { p_link }) {
@@ -111,6 +129,7 @@ export const fakeSupabase = {
   },
   from: (table) => new Query(table),
   channel: () => channel,
+  storage,
   removeChannel() {},
   auth: {
     admin: { getUserById: async () => ({ data: { user: { user_metadata: { full_name: 'Anthony Y' } } } }) },

@@ -139,19 +139,28 @@ for (const c of fakeSupabase.tables.categories) c.user_id = 'u1'
   const L = [['Google Classroom', 'https://classroom.google.com'], ['', 'https://www.khanacademy.org'], ['Desmos', 'https://www.desmos.com/calculator'], ['Gmail', 'https://mail.google.com']]
   T.dashboard_links.push(...L.map(([title, url], i) => ({ id: crypto.randomUUID(), user_id: 'u1', title, url, position: i, created_at: new Date().toISOString() })))
 }
+// A shared file, opened with ?as=file.
+const FILE_TOKEN = 'preview-file-token-0000000000000'
+{
+  const note = '# Reading list\n\n- The Art of Problem Solving, vol. 1\n- Euclidean geometry notes\n'
+  const path = 'u1/f1/reading-list.md'
+  fakeSupabase.storage.objects.set(path, new Blob([note], { type: 'text/markdown' }))
+  fakeSupabase.tables.shared_files.push({ id: 'f1', user_id: 'u1', name: 'reading-list.md', path, mime: 'text/markdown', size: note.length, token: FILE_TOKEN, created_at: new Date().toISOString() })
+}
 globalThis.__AGENDA_FAKE_SUPABASE__ = fakeSupabase
 globalThis.__AGENDA_TEST_DB__ = fakeSupabase
 window.__fake = fakeSupabase
 
 // Run the real /api/share and /api/book handlers in the page against the fake DB.
-const [{ default: shareApi }, { default: bookApi }, { default: groupApi }] = await Promise.all([
+const [{ default: shareApi }, { default: bookApi }, { default: groupApi }, { default: fileApi }] = await Promise.all([
   import('../../api/share.js'),
   import('../../api/book.js'),
   import('../../api/group.js'),
+  import('../../api/file.js'),
 ])
 const realFetch = window.fetch.bind(window)
 window.fetch = async (url, init = {}) => {
-  const handler = { '/api/share': shareApi, '/api/book': bookApi, '/api/group': groupApi }[url]
+  const handler = { '/api/share': shareApi, '/api/book': bookApi, '/api/group': groupApi, '/api/file': fileApi }[url]
   if (!handler) return realFetch(url, init)
   let status = 200
   let body = ''
@@ -160,22 +169,26 @@ window.fetch = async (url, init = {}) => {
   return new Response(body, { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { default: BookingPage }, { default: SharedGroupPage }] = await Promise.all([
+const [{ createRoot }, { default: Workspace }, { default: SharedWorkspace }, { default: BookingPage }, { default: SharedGroupPage }, { default: FileViewer }, { FILES_OWNER }] = await Promise.all([
   import('react-dom/client'),
   import('../components/Workspace'),
   import('../components/SharedWorkspace'),
   import('../components/BookingPage'),
   import('../components/competitions/SharedGroupPage'),
+  import('../components/FileViewer'),
+  import('../lib/files'),
   import('../index.css'),
   import('../lib/theme'),
 ])
-// ?as=guest → edit-link view, ?as=booker → booking page, ?as=viewer / ?as=editor → shared competitions (view / edit), default → owner.
+// ?as=guest → edit-link view, ?as=booker → booking page, ?as=viewer / ?as=editor → shared competitions (view / edit),
+// ?as=file → a shared file, default → owner (signed in as the Files owner; ?email=… to see it as someone else).
 const as = new URLSearchParams(location.search).get('as')
-const session = { user: { id: 'u1', email: 'you@example.com', user_metadata: { full_name: 'Preview User' } } }
+const session = { user: { id: 'u1', email: new URLSearchParams(location.search).get('email') ?? FILES_OWNER, user_metadata: { full_name: 'Preview User' } } }
 createRoot(document.getElementById('root')).render(
   as === 'guest' ? <SharedWorkspace token={EDIT_TOKEN} />
     : as === 'booker' ? <BookingPage token={BOOK_TOKEN} />
       : as === 'viewer' ? <SharedGroupPage token={GROUP_TOKEN} />
         : as === 'editor' ? <SharedGroupPage token={GROUP_EDIT_TOKEN} />
+          : as === 'file' ? <FileViewer token={FILE_TOKEN} />
           : <Workspace session={session} />,
 )

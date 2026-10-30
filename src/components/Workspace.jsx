@@ -12,6 +12,7 @@ import ProductivityDial from './ProductivityDial'
 import { useToasts } from './useToasts'
 import { PAGES } from '../pages'
 import { usePref } from '../lib/prefs'
+import { canUseFiles } from '../lib/files'
 import CalendarPage from '../pages/CalendarPage'
 import TestingPage from '../pages/TestingPage'
 import AgendaPage from '../pages/AgendaPage'
@@ -19,6 +20,7 @@ import AgendaPage from '../pages/AgendaPage'
 const FitnessPage = lazy(() => import('../pages/FitnessPage'))
 const CompetitionsPage = lazy(() => import('../pages/CompetitionsPage'))
 const AmcPrepPage = lazy(() => import('../pages/AmcPrepPage'))
+const FilesPage = lazy(() => import('../pages/FilesPage'))
 
 // Settings screens reached from the sidebar (not tabs).
 const SETTINGS_PAGES = ['sharing', 'integrations']
@@ -61,13 +63,15 @@ function useDayCount(fixed) {
  */
 export default function Workspace({ session, backend: backendProp, guest, embed = false }) {
   // Pages this person may open: owners get all (minus the Agenda if they hid it
-  // in Settings), guests the tools on their link, the Notion widget just the calendar.
+  // in Settings, and Files unless it's their account), guests the tools on their
+  // link, the Notion widget just the calendar.
   const [showAgenda] = usePref('showAgenda', true)
+  const filesOwner = canUseFiles(session)
   const pages = useMemo(() => {
     if (embed) return PAGES.filter((p) => p.id === 'calendar')
     if (guest) return PAGES.filter((p) => p.shareable && (guest.tools ?? ['calendar']).includes(p.id))
-    return showAgenda ? PAGES : PAGES.filter((p) => p.id !== 'agenda')
-  }, [embed, guest, showAgenda])
+    return PAGES.filter((p) => (showAgenda || p.id !== 'agenda') && (!p.ownerOnly || filesOwner))
+  }, [embed, guest, showAgenda, filesOwner])
   const limited = Boolean(guest || embed)
   const [blockStyle] = usePref('blockStyle', 'clear')
   const [rateProductivity] = usePref('rateProductivity', false)
@@ -177,6 +181,13 @@ export default function Workspace({ session, backend: backendProp, guest, embed 
     content = (
       <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
         <AmcPrepPage session={session} store={store} toast={toast} onOpenCompetition={openCompetition} />
+      </Suspense>
+    )
+  }
+  else if (page === 'files') {
+    content = (
+      <Suspense fallback={<div className="boot"><div className="spinner" /></div>}>
+        <FilesPage session={session} toast={toast} />
       </Suspense>
     )
   }

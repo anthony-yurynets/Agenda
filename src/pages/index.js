@@ -1,10 +1,11 @@
-import { CalendarDays, Dumbbell, FlaskConical, ListTodo, Sigma, Trophy } from 'lucide-react'
+import { CalendarDays, Dumbbell, FlaskConical, FolderUp, ListTodo, Sigma, Trophy } from 'lucide-react'
 
 /**
  * Top-level pages, shown as tabs in the top bar (in this order). To add a page:
  * add an entry here and render it in Workspace. `shareable` pages can be
  * granted to share links (Sharing → tools); the server must enforce access for
- * any data a shareable page uses (see api/share.js).
+ * any data a shareable page uses (see api/share.js). `ownerOnly` pages only show
+ * for the Files owner (see src/lib/files.js).
  */
 export const PAGES = [
   { id: 'agenda', label: 'Agenda', icon: ListTodo, shareable: false },
@@ -12,6 +13,7 @@ export const PAGES = [
   { id: 'fitness', label: 'Fitness', icon: Dumbbell, shareable: false },
   { id: 'competitions', label: 'Competitions', icon: Trophy, shareable: false },
   { id: 'amc', label: 'AMC Prep', icon: Sigma, shareable: false },
+  { id: 'files', label: 'Files', icon: FolderUp, shareable: false, ownerOnly: true },
   { id: 'testing', label: 'Testing', icon: FlaskConical, shareable: false },
 ]
 
