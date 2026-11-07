@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { DEFAULT_TARGET, DEFAULT_TEST_DATE, guessAmcCompetition } from '../lib/amc'
+import { DEFAULT_TARGET, DEFAULT_TEST_DATE, QUESTIONS, gradeOf, guessAmcCompetition, isMiss, tally } from '../lib/amc'
 
 const MIGRATION_HINT = 'Run supabase/migrations/0014_amc_prep.sql in the Supabase SQL editor to enable AMC Prep.'
 const TABLE = { mocks: 'amc_mocks', errors: 'amc_errors' }
@@ -217,6 +217,72 @@ export function useAmcPrep(userId, { onError } = {}) {
     [commit, enqueue],
   )
 
+  // ── Mock review ──
+  /**
+   * Keeps the error log in step with one problem of a reviewed mock: a miss
+   * (wrong, or blank on #1–18) has exactly one row, anything else has none.
+   * `test` is the loaded test ({ label, problems }).
+   */
+  const syncError = useCallback(
+    (mockId, n, entry, test) => {
+      const problem = test.problems.find((p) => p.n === n)
+      const grade = gradeOf(entry, problem)
+      const existing = Object.values(ref.current.errors).find((e) => e.mock_id === mockId && e.problem === n)
+      if (!isMiss(grade, n)) {
+        if (existing) remove('errors', existing.id)
+        return
+      }
+      const fields = {
+        test: test.label,
+        topic: entry?.topic ?? problem?.topic ?? 'algebra',
+        reason: entry?.reason ?? (grade === 'blank' ? 'time' : 'concept'),
+        key_idea: (entry?.note || problem?.hint || '').slice(0, 2000),
+      }
+      if (!existing) insert('errors', { ...fields, problem: n, mock_id: mockId, redone: false })
+      else if (Object.entries(fields).some(([k, v]) => existing[k] !== v)) update('errors', existing.id, fields)
+    },
+    [insert, update, remove],
+  )
+
+  /** Fills the score in from the answers once every problem has been entered. */
+  const mockPatch = (answers, test) => {
+    const t = tally(answers, test.problems)
+    return t.done ? { answers, correct: t.correct, blank: t.blank, wrong: t.wrong } : { answers }
+  }
+
+  /** Saves what was put on problem n (pick / key / note / reason / topic; '' clears a field). */
+  const answerProblem = useCallback(
+    (mockId, n, patch, test) => {
+      const mock = ref.current.mocks[mockId]
+      if (!mock) return
+      const entry = Object.fromEntries(Object.entries({ ...mock.answers?.[n], ...patch }).filter(([, v]) => v !== '' && v != null))
+      const answers = { ...mock.answers }
+      if (Object.keys(entry).length) answers[n] = entry
+      else delete answers[n]
+      update('mocks', mockId, mockPatch(answers, test))
+      syncError(mockId, n, entry, test)
+    },
+    [update, syncError],
+  )
+
+  /** Points a mock at a test (or none) and regrades every problem against it. */
+  const setMockTest = useCallback(
+    (mockId, test) => {
+      const mock = ref.current.mocks[mockId]
+      if (!mock) return
+      const answers = mock.answers ?? {}
+      update('mocks', mockId, test ? { test_id: test.id, ...mockPatch(answers, test) } : { test_id: null })
+      for (let n = 1; n <= QUESTIONS; n++) {
+        if (test) syncError(mockId, n, answers[n], test)
+        else {
+          const e = Object.values(ref.current.errors).find((x) => x.mock_id === mockId && x.problem === n)
+          if (e) remove('errors', e.id)
+        }
+      }
+    },
+    [update, remove, syncError],
+  )
+
   const mocks = useMemo(() => Object.values(data.mocks), [data.mocks])
   const errors = useMemo(
     () => Object.values(data.errors).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
@@ -233,6 +299,8 @@ export function useAmcPrep(userId, { onError } = {}) {
     addMock: (fields) => insert('mocks', fields),
     updateMock: (id, patch) => update('mocks', id, patch),
     deleteMock: (id) => remove('mocks', id),
+    answerProblem,
+    setMockTest,
     errors,
     addError: (fields) => insert('errors', fields),
     updateError: (id, patch) => update('errors', id, patch),

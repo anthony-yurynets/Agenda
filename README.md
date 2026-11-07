@@ -140,11 +140,26 @@ test (date editable), an editable target score, and the latest mock with its cha
   dinner have no status and stay out of "Coming up". **Remove** deletes the series.
 - **Notepad:** free-form Notion-style notes ("/" for blocks), saved as you type.
 - **Mock scores:** score = 6 × correct + 1.5 × blank (wrong fills itself in), charted against the target.
+- **Mock review:** click a mock to go through it problem by problem. A mock named after a real test ("AMC 10B 2024",
+  "Mock 5 (AMC 10A Fall 2021)") is matched to it on its own, or pick the test from the list. Each problem shows its
+  statement, the answer key (changeable), and buttons for the answer you put. Misses get a reason, topic and a note on
+  why; wrong answers, and blanks on #1–18 only, go to the error log and redo queue automatically (and come back out if
+  you fix the entry). Once all 25 are entered the score fills itself in.
 - **Error log:** test, problem, topic, reason, key idea, redone. Filter by topic or reason; counts flag the weakest
   area; unredone problems form the redo queue.
 - **Topic checklist:** four collapsible groups with percent complete.
 
 The plan, schedule and checklist live in [`src/lib/amc.js`](src/lib/amc.js).
+Past tests are in [`public/amc/`](public/amc), one JSON file each, built by
+[`scripts/build_amc_problems.py`](scripts/build_amc_problems.py) from two datasets: every AMC 10 since 2000 from
+[amc10-atlas](https://github.com/liyong03/amc10-atlas) (scraped from the AoPS wiki, with diagrams and topic labels) and
+every AMC 12 since 2000 except 2021 from [edev2000/amc12-full](https://huggingface.co/datasets/edev2000/amc12-full)
+(no diagrams, except on problems also on that year's AMC 10). [`scripts/amc_extra.json`](scripts/amc_extra.json) fills
+the gaps: the four 2021 AMC 12s from archived AoPS wiki pages, and the 2026 AMC 10A/12A plus 2025 AMC 12A #25 from the
+[Random Math Wiki](https://wiki.randommath.com/amc10/2026/part-a/) (scraped by
+[`scripts/scrape_randommath.py`](scripts/scrape_randommath.py), diagrams in `public/amc/img/`, topics labelled by
+hand). The 371 problems on both an AMC 10 and an AMC 12 agree on every answer. 2025 AMC 12A #25 has no answer key: its
+correct count (8) isn't one of the choices. The 2026 AMC 10B/12B (Nov 13) aren't in yet.
 
 ## Sharing
 

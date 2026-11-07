@@ -167,9 +167,74 @@ export const guessAmcCompetition = (comps) => {
  */
 export function aopsUrl(test, problem) {
   const year = test?.match(/\b(19|20)\d{2}\b/)?.[0]
-  const level = test?.match(/(?<!\d)(10|12)\s*([AB])\b/i)
-  if (!year || !level) return null
+  const level = test?.match(/(?<!\d)(10|12)\s*([AB])?\b/i)
+  // Only 2000 and 2001 had a single AMC 10 / 12 with no A or B.
+  if (!year || !level || (!level[2] && year > 2001)) return null
   const fall = /\bfall\b/i.test(test) ? 'Fall_' : ''
-  const page = `${year}_${fall}AMC_${level[1]}${level[2].toUpperCase()}_Problems`
+  const page = `${year}_${fall}AMC_${level[1]}${(level[2] ?? '').toUpperCase()}_Problems`
   return `https://artofproblemsolving.com/wiki/index.php/${page}${problem ? `/Problem_${problem}` : ''}`
+}
+
+// ── Mock review ──────────────────────────────────────────────────────────────
+// Real tests live in public/amc/ (built by scripts/build_amc_problems.py):
+// index.json lists them, <id>.json holds one test's problems
+// ({ n, answer, topic, hint, html }). Ids look like '2024-10B', '2021F-10A',
+// '2000-12'.
+
+export const CHOICES = ['A', 'B', 'C', 'D', 'E']
+/** Blanks on these problems go to the redo queue; later ones are fair to skip. */
+export const LOG_BLANKS_THROUGH = 18
+
+const cache = new Map()
+const load = (path) => {
+  if (!cache.has(path)) {
+    cache.set(
+      path,
+      fetch(`/amc/${path}`).then((r) => {
+        if (!r.ok) throw new Error(`Couldn’t load ${path}`)
+        return r.json()
+      }),
+    )
+    cache.get(path).catch(() => cache.delete(path))
+  }
+  return cache.get(path)
+}
+export const loadTestIndex = () => load('index.json')
+export const loadTest = (id) => load(`${id}.json`)
+
+/**
+ * The test a mock's name points at ("Mock 5 (AMC 10A Fall 2021)" → '2021F-10A'),
+ * if it's in the index. Before 2002 there was one AMC 10 and one AMC 12.
+ */
+export function matchTest(name, index) {
+  const year = name?.match(/\b(19|20)\d{2}\b/)?.[0]
+  const level = name?.match(/(?<!\d)(10|12)\s*([AB])?\b/i)
+  if (!year || !level || !index) return null
+  const fall = /\bfall\b/i.test(name) ? 'F' : ''
+  const ids = new Set(index.map((t) => t.id))
+  const tries = [`${year}${fall}-${level[1]}${(level[2] ?? '').toUpperCase()}`, `${year}-${level[1]}`]
+  return tries.find((id) => ids.has(id)) ?? null
+}
+
+/** The answer key for a problem: the stored override, else the dataset's (may list two). */
+export const keyOf = (entry, problem) => entry?.key || problem?.answer || ''
+
+/** 'correct' | 'wrong' | 'blank' | 'unset' (no pick yet, or no key to grade against). */
+export function gradeOf(entry, problem) {
+  const pick = entry?.pick
+  if (!pick) return 'unset'
+  if (pick === 'blank') return 'blank'
+  const key = keyOf(entry, problem)
+  if (!key) return 'unset'
+  return key.includes(pick) ? 'correct' : 'wrong'
+}
+
+/** Whether a problem belongs in the error log: wrong, or blank on #1–18. */
+export const isMiss = (grade, n) => grade === 'wrong' || (grade === 'blank' && n <= LOG_BLANKS_THROUGH)
+
+/** Counts over a test's problems; `done` once every problem has a graded pick. */
+export function tally(answers, problems) {
+  const out = { correct: 0, wrong: 0, blank: 0, unset: 0 }
+  for (let n = 1; n <= QUESTIONS; n++) out[gradeOf(answers?.[n], problems?.find((p) => p.n === n))]++
+  return { ...out, done: out.unset === 0 }
 }

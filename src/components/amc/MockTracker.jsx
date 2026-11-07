@@ -1,14 +1,26 @@
-import { useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { PLAN_END, PLAN_START, QUESTIONS, fmtDay, scoreOf, scoredMocks, wrongOf } from '../../lib/amc'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { PLAN_END, PLAN_START, QUESTIONS, fmtDay, loadTestIndex, matchTest, scoreOf, scoredMocks, wrongOf } from '../../lib/amc'
 import ScoreChart from './ScoreChart'
+
+// KaTeX comes with it, so it loads when a review is first opened.
+const MockReview = lazy(() => import('./MockReview'))
 
 const num = (v) => (v === '' || v == null ? null : Number(v))
 const blankForm = (today) => ({ id: null, name: '', date: today, correct: '', blank: '', wrong: '' })
 
-/** Log mock tests (score = 6 × correct + 1.5 × blank) and chart them against the target. */
+/**
+ * Log mock tests (score = 6 × correct + 1.5 × blank) and chart them against the
+ * target. A mock named after a real test ("AMC 10B 2024") opens its review,
+ * where each problem's answer is entered and misses go to the error log.
+ */
 export default function MockTracker({ amc, target, today }) {
   const [form, setForm] = useState(() => blankForm(today))
+  const [reviewing, setReviewing] = useState(null)
+  const [index, setIndex] = useState(null)
+  useEffect(() => {
+    loadTestIndex().then(setIndex, () => {})
+  }, [])
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
 
   const correct = num(form.correct)
@@ -24,7 +36,10 @@ export default function MockTracker({ amc, target, today }) {
     if (invalid || !form.date) return
     const row = { name: form.name.trim() || 'Mock', date: form.date, correct, blank: correct === null ? blank : (blank ?? 0), wrong }
     if (form.id) amc.updateMock(form.id, row)
-    else amc.addMock(row)
+    else {
+      const id = amc.addMock(row)
+      if (matchTest(row.name, index)) setReviewing(id)
+    }
     setForm(blankForm(today))
   }
   const edit = (m) => set({ id: m.id, name: m.name, date: m.date, correct: m.correct ?? '', blank: m.blank ?? '', wrong: m.wrong ?? '' })
@@ -89,9 +104,14 @@ export default function MockTracker({ amc, target, today }) {
           return (
             <li key={m.id} className={form.id === m.id ? 'editing' : ''}>
               <span className="ml-date">{fmtDay(m.date)}</span>
-              <span className="ml-name">{m.name || 'Mock'}</span>
+              <button className="ml-name" onClick={() => setReviewing(m.id)} title="Review problem by problem">
+                {m.name || 'Mock'}
+              </button>
               <span className="ml-split muted">{s === null ? 'Not graded yet' : `${m.correct} ✓ · ${m.blank ?? 0} blank · ${wrongOf(m) ?? 0} ✗`}</span>
               <strong className={`ml-score ${s !== null && s >= target ? 'hit' : ''}`}>{s ?? '—'}</strong>
+              <button className="icon-btn sm" onClick={() => setReviewing(m.id)} aria-label={`Review ${m.name} problem by problem`} title="Review problems">
+                <ListChecks size={13} />
+              </button>
               <button className="icon-btn sm" onClick={() => edit(m)} aria-label={`Edit ${m.name}`}>
                 <Pencil size={13} />
               </button>
@@ -102,6 +122,11 @@ export default function MockTracker({ amc, target, today }) {
           )
         })}
       </ul>
+      {reviewing && (
+        <Suspense fallback={null}>
+          <MockReview amc={amc} mockId={reviewing} onClose={() => setReviewing(null)} />
+        </Suspense>
+      )}
     </section>
   )
 }
