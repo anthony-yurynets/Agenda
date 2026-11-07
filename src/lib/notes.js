@@ -3,7 +3,7 @@
 //
 // One line is one block. Supported: paragraphs, # / ## / ### headings,
 // - bullets, 1. numbered items, - [ ] to-dos, > quotes, > [!💡] callouts,
-// ``` code ``` and --- dividers. Lists, to-dos and paragraphs nest with two spaces per level.
+// ``` code ```, $$ math $$ (TeX) and --- dividers. Lists, to-dos and paragraphs nest with two spaces per level.
 
 export const BLOCK_TYPES = [
   { id: 'p', label: 'Text', hint: 'Plain text', keys: ['text', 'paragraph', 'plain'] },
@@ -15,6 +15,7 @@ export const BLOCK_TYPES = [
   { id: 'number', label: 'Numbered list', hint: 'A list with numbering', md: '1.', keys: ['number', 'numbered', 'ordered', 'ol', 'list'] },
   { id: 'quote', label: 'Quote', hint: 'Capture a quote', md: '>', keys: ['quote', 'blockquote', 'citation'] },
   { id: 'callout', label: 'Callout', hint: 'Make a note stand out', keys: ['callout', 'note', 'info', 'tip', 'warning', 'box', 'aside', 'highlight'] },
+  { id: 'math', label: 'Math equation', hint: 'Write TeX, see it typeset', md: '$$', keys: ['math', 'equation', 'tex', 'latex', 'katex', 'formula'] },
   { id: 'code', label: 'Code', hint: 'A block of code', md: '```', keys: ['code', 'snippet', 'pre'] },
   { id: 'divider', label: 'Divider', hint: 'Separate sections', md: '---', keys: ['divider', 'line', 'separator', 'hr', 'rule'] },
 ]
@@ -34,7 +35,7 @@ export const newBlock = (type = 'p', text = '', extra = {}) => ({ id: `nb${++seq
 
 // Text that would read back as a marker gets a backslash, so a paragraph that
 // happens to start with "- " stays a paragraph.
-const MARKER = /^(#{1,3} |[-*+] |\d+[.)] |> |```|---\s*$|\[[ xX]?\] |\\)/
+const MARKER = /^(#{1,3} |[-*+] |\d+[.)] |> |```|\$\$|---\s*$|\[[ xX]?\] |\\)/
 
 /** Markdown text → blocks. Never returns an empty list. */
 export function parseNotes(text) {
@@ -48,6 +49,20 @@ export function parseNotes(text) {
       let j = i + 1
       while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) body.push(lines[j++])
       out.push(newBlock('code', body.join('\n'), { lang: fence[1].trim() }))
+      i = j
+      continue
+    }
+    // $$ on its own line opens a math block (TeX) that runs to the next $$; $$x$$ is a one-line one.
+    const inline = raw.match(/^\s*\$\$(.+)\$\$\s*$/)
+    if (inline) {
+      out.push(newBlock('math', inline[1].trim()))
+      continue
+    }
+    if (/^\s*\$\$\s*$/.test(raw)) {
+      const body = []
+      let j = i + 1
+      while (j < lines.length && !/^\s*\$\$\s*$/.test(lines[j])) body.push(lines[j++])
+      out.push(newBlock('math', body.join('\n').trim()))
       i = j
       continue
     }
@@ -100,6 +115,9 @@ export function serializeNotes(blocks) {
       case 'code':
         lines.push(`\`\`\`${b.lang ?? ''}`, ...b.text.split('\n'), '```')
         break
+      case 'math':
+        lines.push('$$', ...(b.text ? b.text.split('\n') : []), '$$')
+        break
       case 'divider':
         lines.push('---')
         break
@@ -135,6 +153,7 @@ export function shortcutFor(text) {
     [/^1[.)] /, 'number'],
     [/^> /, 'quote'],
     [/^```$/, 'code'],
+    [/^\$\$$/, 'math'],
     [/^---$/, 'divider'],
   ]
   for (const [re, type] of rules) {

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import {
   Check,
   CheckSquare,
@@ -13,12 +13,14 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  Sigma,
   Trash2,
   Type,
 } from 'lucide-react'
 import { BLOCK_TYPES, CALLOUT_ICONS, CONTINUES, INDENTABLE, MAX_INDENT, matchTypes, newBlock, numberAt, parseNotes, serializeNotes, shortcutFor } from '../lib/notes'
+import { MathBlock, MathEditor } from './NotesMath'
 
-const ICONS = { p: Type, h1: Heading1, h2: Heading2, h3: Heading3, todo: CheckSquare, bullet: List, number: ListOrdered, quote: Quote, callout: Lightbulb, code: Code2, divider: Minus }
+const ICONS = { p: Type, h1: Heading1, h2: Heading2, h3: Heading3, todo: CheckSquare, bullet: List, number: ListOrdered, quote: Quote, callout: Lightbulb, math: Sigma, code: Code2, divider: Minus }
 const BULLETS = ['•', '◦', '▪']
 const PLACEHOLDER = { h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', todo: 'To-do', bullet: 'List', number: 'List', quote: 'Empty quote', callout: 'Callout', code: 'Code' }
 
@@ -50,7 +52,7 @@ const autosize = (el) => {
 
 /**
  * Notion-style notes: one block per line, "/" for the block menu, Markdown
- * shortcuts ("# ", "- ", "[] ", "1. ", "> ", "```", "---"), Enter/Backspace
+ * shortcuts ("# ", "- ", "[] ", "1. ", "> ", "```", "$$", "---"), Enter/Backspace
  * to split and join, Tab to nest, drag the handle to reorder. Reads and writes
  * Markdown text (lib/notes), so it drops in for a plain textarea.
  */
@@ -67,6 +69,8 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
   const [menu, setMenu] = useState(null)
   const [drag, setDrag] = useState(null) // { id, over, after }
   const [tooLong, setTooLong] = useState(0)
+  // The math block whose TeX box is open: { id, fresh } (fresh = just made from / or $$).
+  const [mathEdit, setMathEdit] = useState(null)
   const refs = useRef(new Map())
   const focusReq = useRef(null)
   const rootRef = useRef(null)
@@ -135,6 +139,12 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
       list = [...list.slice(0, i + 1), nb, ...list.slice(i + 1)]
       target = nb.id
     }
+    if (type === 'math') {
+      // The TeX box takes focus, so no caret request here.
+      setMenu(null)
+      commit(list)
+      return setMathEdit({ id: target, fresh: !menu.handle })
+    }
     // A divider needs somewhere to keep typing after it.
     const ti = list.findIndex((x) => x.id === target)
     if (type === 'divider') {
@@ -168,6 +178,10 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
       // Fires once, as the marker is completed (typed or pasted), not on every later edit.
       if (sc && !b.text.startsWith(text.slice(0, text.length - sc.rest.length))) {
         setMenu(null)
+        if (sc.type === 'math') {
+          commit(convert(list, i, 'math', { text: '' }))
+          return setMathEdit({ id: b.id, fresh: true })
+        }
         if (sc.type === 'divider') {
           const p = newBlock('p', '', { indent: b.indent })
           list = convert(list, i, 'divider')
@@ -295,6 +309,38 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
     } else if (e.key === 'Escape') e.currentTarget.blur()
   }
 
+  const onMathKey = (i, e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.stopPropagation()
+      e.preventDefault()
+      return setMathEdit({ id: blocks[i].id, fresh: false })
+    }
+    onDividerKey(i, e)
+  }
+
+  /** Close the TeX box. keep: save the draft; next: move on to a line below (Enter / Done). */
+  const closeMath = (tex, keep, next) => {
+    const edit = mathEdit
+    setMathEdit(null)
+    const i = indexOf(edit?.id)
+    if (i < 0) return
+    const b = blocks[i]
+    if (!keep) {
+      // Escaping out of a brand-new, still-empty equation takes it back to a plain line.
+      if (edit.fresh && !b.text.trim()) return commit(convert(blocks, i, 'p', { text: '' }), { id: b.id, pos: 0 })
+      return next && focusNeighbor(i, 0)
+    }
+    let list = patchAt(blocks, i, { text: tex.trim() })
+    if (!next) return commit(list)
+    if (!edit.fresh) return commit(list, { id: b.id, pos: 0 })
+    const after = list[i + 1]
+    if (after?.type === 'p' && !after.text && !after.indent) return commit(list, { id: after.id, pos: 0 })
+    const p = newBlock()
+    list = [...list.slice(0, i + 1), p, ...list.slice(i + 1)]
+    commit(list, { id: p.id, pos: 0 })
+  }
+  const mathAnchor = useCallback(() => refs.current.get(mathEdit?.id), [mathEdit?.id])
+
   const onPaste = (i, e) => {
     const b = blocks[i]
     const text = e.clipboardData.getData('text/plain')
@@ -414,7 +460,17 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
               </button>
             )}
 
-            {b.type === 'divider' ? (
+            {b.type === 'math' ? (
+              <MathBlock
+                tex={b.text}
+                readOnly={readOnly}
+                ref={(el) => (el ? refs.current.set(b.id, el) : refs.current.delete(b.id))}
+                onOpen={() => setMathEdit({ id: b.id, fresh: false })}
+                onKeyDown={(e) => onMathKey(i, e)}
+                onFocus={() => setFocusedId(b.id)}
+                onBlur={() => setFocusedId((f) => (f === b.id ? null : f))}
+              />
+            ) : b.type === 'divider' ? (
               <div
                 className="nb-hr"
                 tabIndex={readOnly ? -1 : 0}
@@ -445,6 +501,10 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
                   if (slash && !slash.handle) setMenu(null)
                 }}
               />
+            )}
+
+            {mathEdit?.id === b.id && !readOnly && (
+              <MathEditor key={b.id} anchor={mathAnchor} initial={b.text} onDone={(tex, next) => closeMath(tex, true, next)} onCancel={() => closeMath('', false, true)} />
             )}
 
             {slash && (

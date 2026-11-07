@@ -138,7 +138,7 @@ test (date editable), an editable target score, and the latest mock with its cha
 - **Daily blocks:** **Add to calendar** creates the evening schedule as daily repeating blocks (Oct 12 – Nov 10) in an
   *AMC prep* category. Each day's *Topic review* occurrence is titled with that day's topic from the plan; breaks and
   dinner have no status and stay out of "Coming up". **Remove** deletes the series.
-- **Notepad:** free-form Notion-style notes ("/" for blocks), saved as you type.
+- **Notepad:** free-form Notion-style notes ("/" for blocks), saved as you type. `/math` (or `$$`) opens a TeX box with a live preview; Enter drops the typeset equation into the note, and clicking it edits the TeX again. Equations are stored as `$$ … $$` lines.
 - **Mock scores:** score = 6 × correct + 1.5 × blank (wrong fills itself in), charted against the target.
 - **Mock review:** click a mock to go through it problem by problem. A mock named after a real test ("AMC 10B 2024",
   "Mock 5 (AMC 10A Fall 2021)") is matched to it on its own, or pick the test from the list. Each problem shows its
