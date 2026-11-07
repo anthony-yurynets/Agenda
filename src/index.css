@@ -534,6 +534,11 @@ input:disabled { color: var(--muted); }
 .nb-h3 .nb-text { font-size: 15.5px; font-weight: 600; line-height: 1.4; padding-top: 6px; }
 .nb-h1:first-child .nb-text, .nb-h2:first-child .nb-text, .nb-h3:first-child .nb-text { padding-top: 2px; }
 .nb-h1 .nb-gutter { top: 10px; } .nb-h2 .nb-gutter { top: 8px; } .nb-h3 .nb-gutter { top: 6px; }
+.nb-callout { margin: 3px 0; padding: 6px 10px 6px 8px; gap: 8px; border-radius: 8px; background: var(--accent-soft); }
+.nb-callout .nb-gutter { top: 8px; left: -24px; }
+.nb-icon { flex: 0 0 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; font-size: 16px; line-height: 1; }
+.nb-icon:not(:disabled):hover { background: var(--fill-hover); }
+.nb-icon:disabled { cursor: default; }
 .nb-quote .nb-text { border-left: 3px solid var(--ink); border-radius: 0; padding-left: 12px; margin: 2px 0; }
 .nb-code .nb-text {
   margin: 4px 0; padding: 9px 11px; border-radius: 8px; background: var(--fill-hover) !important;
@@ -1712,26 +1717,15 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
 .ah-stat input.ah-target { width: 96px; height: 36px; padding: 0 8px; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; background: transparent; margin-left: -8px; }
 .ah-stat input.ah-target:hover, .ah-stat input.ah-target:focus { background: var(--glass-strong); }
 
-/* Plan */
+/* Notepad */
+.amc-notes .notes-editor { flex: 1; min-height: 260px; max-height: 520px; overflow-y: auto; scrollbar-width: thin; }
 .amc-plan { display: flex; flex-direction: column; }
-.plan-wrap { max-height: 470px; overflow-y: auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; }
 .amc-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .amc-table th {
   position: sticky; top: 0; z-index: 1; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--muted); padding: 6px 8px; background: var(--glass-solid); border-bottom: 1px solid var(--hairline);
 }
 .amc-table td { padding: 8px; border-bottom: 1px solid var(--hairline-soft); vertical-align: middle; }
-.plan-table th:first-child, .plan-table td:first-child { width: 92px; }
-.plan-table th:last-child, .plan-table td:last-child { width: 52px; text-align: center; }
-.pt-date { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pt-date span { display: inline-block; width: 30px; font-weight: 500; color: var(--muted); }
-.plan-table tr.today td { background: var(--accent-soft); }
-.plan-table tr.today td:first-child { box-shadow: inset 3px 0 0 var(--accent); border-radius: 8px 0 0 8px; }
-.plan-table tr.today td:last-child { border-radius: 0 8px 8px 0; }
-.plan-table tr.today .pt-date, .plan-table tr.today .pt-date span { color: var(--accent); }
-.plan-table tr.done td:not(.pt-done) { opacity: 0.5; }
-.plan-table tr.done .pt-topic { text-decoration: line-through; text-decoration-color: var(--muted); }
-.plan-table tr.missed .pt-date { color: var(--down); }
 
 /* Daily blocks */
 .sched-day { margin: -4px 0 8px; color: var(--ink-2); }
@@ -1850,19 +1844,6 @@ a.ql-tile:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(-
   .ah-stat strong { font-size: 24px; }
   .ah-stat input.ah-target { width: 100%; font-size: 22px; }
   .ah-label { font-size: 10px; }
-  .plan-wrap { max-height: 60vh; }
-  .plan-table th:nth-child(3) { display: none; }
-  .plan-table td.pt-evening { display: block; padding-top: 0; border: 0; }
-  .plan-table tr { display: grid; grid-template-columns: 70px minmax(0, 1fr) 40px; border-bottom: 1px solid var(--hairline-soft); }
-  .plan-table thead tr { display: none; }
-  .plan-table td { border: 0; padding: 7px 6px; }
-  .plan-table td:first-child, .plan-table td:last-child { width: auto; }
-  .plan-table .pt-date { grid-row: span 2; }
-  .plan-table .pt-done { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
-  .plan-table td.pt-evening { grid-column: 2; grid-row: 2; padding: 0 6px 8px; color: var(--ink-2); }
-  .plan-table tr.today { background: var(--accent-soft); border-radius: 8px; box-shadow: inset 3px 0 0 var(--accent); }
-  .plan-table tr.today td { background: none; box-shadow: none; }
-  .pt-date span { display: block; }
   .sched-list li { grid-template-columns: 82px minmax(0, 1fr); }
   .mock-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mock-form .mf-name { grid-column: 1 / -1; }

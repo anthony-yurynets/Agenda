@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarCheck, CalendarPlus, ChevronDown, ExternalLink, Sigma, Trophy } from 'lucide-react'
 import { useAmcPrep } from '../state/useAmcPrep'
 import { todayISO } from '../lib/dates'
@@ -21,6 +21,7 @@ import {
 } from '../lib/amc'
 import MockTracker from '../components/amc/MockTracker'
 import ErrorLog from '../components/amc/ErrorLog'
+import NotesEditor from '../components/NotesEditor'
 
 const clock = (mins) => {
   const [h, m] = fromMinutes(mins).split(':').map(Number)
@@ -234,61 +235,20 @@ function DailyBlocks({ store, prep, amc, today }) {
   )
 }
 
-/** The 30-day plan, today highlighted, with a done box per day. */
-function PlanTable({ prep, amc, today }) {
-  const wrapRef = useRef(null)
-  const todayRef = useRef(null)
-  // Start scrolled to today (inside the table, not the page).
-  useEffect(() => {
-    const wrap = wrapRef.current
-    const row = todayRef.current
-    if (wrap && row) wrap.scrollTop = row.offsetTop - wrap.clientHeight / 3
-  }, [])
-  const done = new Set(prep.plan_done ?? [])
-
+/** A scratch notepad for anything worth jotting down, edited as Notion-style blocks. */
+function Notepad({ prep, amc }) {
   return (
-    <section className="glass-tile amc-plan">
+    <section className="glass-tile amc-plan amc-notes">
       <div className="tile-head">
-        <h3>30-day plan</h3>
-        <span className="muted small">
-          {PLAN.filter((p) => done.has(p.date)).length}/{PLAN.length} done
-        </span>
+        <h3>Notepad</h3>
       </div>
-      <div className="plan-wrap" ref={wrapRef}>
-        <table className="amc-table plan-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Topic block</th>
-              <th>Evening block</th>
-              <th>Done</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PLAN.map((p) => {
-              const isToday = p.date === today
-              const mock = /^Mock/.test(p.evening)
-              return (
-                <tr
-                  key={p.date}
-                  ref={isToday ? todayRef : null}
-                  className={`${isToday ? 'today' : ''} ${done.has(p.date) ? 'done' : ''} ${p.date < today && !done.has(p.date) ? 'missed' : ''}`}
-                  aria-current={isToday ? 'date' : undefined}
-                >
-                  <td className="pt-date">
-                    <span>{fmtDay(p.date, { weekday: 'short' })}</span> {fmtDay(p.date)}
-                  </td>
-                  <td className="pt-topic">{p.topic}</td>
-                  <td className="pt-evening">{mock ? <span className="amc-tag mock">{p.evening}</span> : p.evening}</td>
-                  <td className="pt-done">
-                    <input type="checkbox" className="amc-check" checked={done.has(p.date)} onChange={() => amc.toggleIn('plan_done', p.date)} aria-label={`Done ${fmtDay(p.date)}`} />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <NotesEditor
+        label="Notepad"
+        placeholder="Jot anything down: tricks, formulas, reminders… type “/” for blocks"
+        value={prep.notes ?? ''}
+        maxLength={20000}
+        onChange={(notes) => amc.savePrep({ notes }, { debounce: 500 })}
+      />
     </section>
   )
 }
@@ -336,7 +296,7 @@ function TopicChecklist({ prep, amc }) {
 
 /**
  * AMC 10 → AIME prep: countdown and scores, the daily schedule (as repeating
- * calendar blocks), the 30-day plan, mock tracker, error log and topic checklist.
+ * calendar blocks), a notepad, mock tracker, error log and topic checklist.
  * Linked to the AMC entry in the competition tracker.
  */
 export default function AmcPrepPage({ session, store, toast, onOpenCompetition }) {
@@ -369,7 +329,7 @@ export default function AmcPrepPage({ session, store, toast, onOpenCompetition }
     <div className="amc">
       <div className="amc-grid">
         <Header amc={amc} prep={prep} today={today} onOpenCompetition={onOpenCompetition} />
-        <PlanTable prep={prep} amc={amc} today={today} />
+        <Notepad prep={prep} amc={amc} />
         <DailyBlocks store={store} prep={prep} amc={amc} today={today} />
         <MockTracker amc={amc} target={target} today={today} />
         <TopicChecklist prep={prep} amc={amc} />

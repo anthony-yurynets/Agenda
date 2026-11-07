@@ -8,6 +8,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Lightbulb,
   List,
   ListOrdered,
   Minus,
@@ -15,11 +16,11 @@ import {
   Trash2,
   Type,
 } from 'lucide-react'
-import { BLOCK_TYPES, CONTINUES, INDENTABLE, MAX_INDENT, matchTypes, newBlock, numberAt, parseNotes, serializeNotes, shortcutFor } from '../lib/notes'
+import { BLOCK_TYPES, CALLOUT_ICONS, CONTINUES, INDENTABLE, MAX_INDENT, matchTypes, newBlock, numberAt, parseNotes, serializeNotes, shortcutFor } from '../lib/notes'
 
-const ICONS = { p: Type, h1: Heading1, h2: Heading2, h3: Heading3, todo: CheckSquare, bullet: List, number: ListOrdered, quote: Quote, code: Code2, divider: Minus }
+const ICONS = { p: Type, h1: Heading1, h2: Heading2, h3: Heading3, todo: CheckSquare, bullet: List, number: ListOrdered, quote: Quote, callout: Lightbulb, code: Code2, divider: Minus }
 const BULLETS = ['•', '◦', '▪']
-const PLACEHOLDER = { h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', todo: 'To-do', bullet: 'List', number: 'List', quote: 'Empty quote', code: 'Code' }
+const PLACEHOLDER = { h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', todo: 'To-do', bullet: 'List', number: 'List', quote: 'Empty quote', callout: 'Callout', code: 'Code' }
 
 /** Is the caret on the first (or last) visual line of a textarea? Measured with a mirror div, since lines wrap. */
 function caretLine(el, which) {
@@ -110,6 +111,7 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
     if (!INDENTABLE.has(type)) patch.indent = 0
     if (type === 'todo' && b.type !== 'todo') patch.checked = Boolean(extra.checked)
     if (type === 'divider') patch.text = ''
+    if (type === 'callout' && !b.icon) patch.icon = CALLOUT_ICONS[0]
     return patchAt(list, i, patch)
   }
 
@@ -129,7 +131,7 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
     if (menu.handle || !rest.trim()) {
       list = convert(list, i, type, menu.handle ? {} : { text: '' })
     } else {
-      const nb = newBlock(type, '', { indent: INDENTABLE.has(type) ? b.indent : 0 })
+      const nb = newBlock(type, '', { indent: INDENTABLE.has(type) ? b.indent : 0, ...(type === 'callout' && { icon: CALLOUT_ICONS[0] }) })
       list = [...list.slice(0, i + 1), nb, ...list.slice(i + 1)]
       target = nb.id
     }
@@ -395,6 +397,22 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
             )}
             {b.type === 'bullet' && <span className="nb-marker" aria-hidden="true">{BULLETS[b.indent % BULLETS.length]}</span>}
             {b.type === 'number' && <span className="nb-marker nb-num" aria-hidden="true">{numberAt(blocks, i)}.</span>}
+            {b.type === 'callout' && (
+              <button
+                type="button"
+                className="nb-icon"
+                disabled={readOnly}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const next = CALLOUT_ICONS[(CALLOUT_ICONS.indexOf(b.icon) + 1) % CALLOUT_ICONS.length]
+                  commit(patchAt(blocks, i, { icon: next }))
+                }}
+                aria-label="Change callout icon"
+                title="Change icon"
+              >
+                {b.icon || CALLOUT_ICONS[0]}
+              </button>
+            )}
 
             {b.type === 'divider' ? (
               <div
@@ -437,7 +455,7 @@ export default function NotesEditor({ value, onChange, placeholder = 'Write some
                 onPick={applyType}
                 onHover={(n) => !slash.handle && setMenu({ ...slash, active: n })}
                 onDuplicate={() => {
-                  const copy = newBlock(b.type, b.text, { indent: b.indent, checked: b.checked, lang: b.lang })
+                  const copy = newBlock(b.type, b.text, { indent: b.indent, checked: b.checked, lang: b.lang, icon: b.icon })
                   setMenu(null)
                   commit([...blocks.slice(0, i + 1), copy, ...blocks.slice(i + 1)], { id: copy.id, pos: 'end' })
                 }}

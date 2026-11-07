@@ -138,7 +138,7 @@ test (date editable), an editable target score, and the latest mock with its cha
 - **Daily blocks:** **Add to calendar** creates the evening schedule as daily repeating blocks (Oct 12 – Nov 10) in an
   *AMC prep* category. Each day's *Topic review* occurrence is titled with that day's topic from the plan; breaks and
   dinner have no status and stay out of "Coming up". **Remove** deletes the series.
-- **30-day plan** with a done box per day; today's row is highlighted.
+- **Notepad:** free-form Notion-style notes ("/" for blocks), saved as you type.
 - **Mock scores:** score = 6 × correct + 1.5 × blank (wrong fills itself in), charted against the target.
 - **Error log:** test, problem, topic, reason, key idea, redone. Filter by topic or reason; counts flag the weakest
   area; unredone problems form the redo queue.

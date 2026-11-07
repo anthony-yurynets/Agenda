@@ -2,8 +2,8 @@
 // tools and exports keep working) and edited as Notion-style blocks.
 //
 // One line is one block. Supported: paragraphs, # / ## / ### headings,
-// - bullets, 1. numbered items, - [ ] to-dos, > quotes, ``` code ``` and ---
-// dividers. Lists, to-dos and paragraphs nest with two spaces per level.
+// - bullets, 1. numbered items, - [ ] to-dos, > quotes, > [!💡] callouts,
+// ``` code ``` and --- dividers. Lists, to-dos and paragraphs nest with two spaces per level.
 
 export const BLOCK_TYPES = [
   { id: 'p', label: 'Text', hint: 'Plain text', keys: ['text', 'paragraph', 'plain'] },
@@ -14,6 +14,7 @@ export const BLOCK_TYPES = [
   { id: 'bullet', label: 'Bulleted list', hint: 'A simple bulleted list', md: '-', keys: ['bullet', 'list', 'unordered', 'ul'] },
   { id: 'number', label: 'Numbered list', hint: 'A list with numbering', md: '1.', keys: ['number', 'numbered', 'ordered', 'ol', 'list'] },
   { id: 'quote', label: 'Quote', hint: 'Capture a quote', md: '>', keys: ['quote', 'blockquote', 'citation'] },
+  { id: 'callout', label: 'Callout', hint: 'Make a note stand out', keys: ['callout', 'note', 'info', 'tip', 'warning', 'box', 'aside', 'highlight'] },
   { id: 'code', label: 'Code', hint: 'A block of code', md: '```', keys: ['code', 'snippet', 'pre'] },
   { id: 'divider', label: 'Divider', hint: 'Separate sections', md: '---', keys: ['divider', 'line', 'separator', 'hr', 'rule'] },
 ]
@@ -24,6 +25,9 @@ export const INDENTABLE = new Set(['p', 'bullet', 'number', 'todo'])
 export const MAX_INDENT = 3
 /** Enter on one of these keeps going with the same type. */
 export const CONTINUES = new Set(['bullet', 'number', 'todo'])
+
+/** Callout icons; clicking a callout's icon steps through them. */
+export const CALLOUT_ICONS = ['💡', '⚠️', '📌', '✅', '❗', '🔥', '📝', '🧠']
 
 let seq = 0
 export const newBlock = (type = 'p', text = '', extra = {}) => ({ id: `nb${++seq}`, type, text, indent: 0, checked: false, ...extra })
@@ -57,6 +61,7 @@ export function parseNotes(text) {
       out.push(newBlock('todo', m[2], { indent, checked: m[1].toLowerCase() === 'x' }))
     else if ((m = line.match(/^[-*+] (.*)$/))) out.push(newBlock('bullet', m[1], { indent }))
     else if ((m = line.match(/^\d+[.)] (.*)$/))) out.push(newBlock('number', m[1], { indent }))
+    else if ((m = line.match(/^> ?\[!([^\]\s]{1,8})\] ?(.*)$/))) out.push(newBlock('callout', m[2], { icon: m[1] }))
     else if ((m = line.match(/^> ?(.*)$/))) out.push(newBlock('quote', m[1]))
     else out.push(newBlock('p', line.startsWith('\\') ? line.slice(1) : line, { indent }))
   }
@@ -88,6 +93,9 @@ export function serializeNotes(blocks) {
         break
       case 'quote':
         lines.push(`> ${b.text}`)
+        break
+      case 'callout':
+        lines.push(`> [!${b.icon || CALLOUT_ICONS[0]}] ${b.text}`)
         break
       case 'code':
         lines.push(`\`\`\`${b.lang ?? ''}`, ...b.text.split('\n'), '```')
@@ -152,6 +160,7 @@ export function notesPreview(text) {
       if (b.type === 'todo') return `${pad}${b.checked ? '☑' : '☐'} ${b.text}`
       if (b.type === 'bullet') return `${pad}• ${b.text}`
       if (b.type === 'number') return `${pad}${numberAt(all, i)}. ${b.text}`
+      if (b.type === 'callout') return `${b.icon || CALLOUT_ICONS[0]} ${b.text}`
       return pad + b.text
     })
     .join('\n')

@@ -85,6 +85,7 @@ export function useAmcPrep(userId, { onError } = {}) {
           plan_done: [],
           topics_done: [],
           block_ids: [],
+          notes: '',
         }
         enqueue(['prep'], () => supabase.from('amc_prep').insert(prep))
         if (!m.data.some((x) => x.name === DIAGNOSTIC.name)) {
